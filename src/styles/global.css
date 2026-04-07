@@ -1,0 +1,115 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+/* ===== DESIGN SYSTEM — FLOWDESK ===== */
+:root {
+  --bg: #F5F4F0;
+  --surface: #FFFFFF;
+  --surface2: #EFEFEB;
+  --border: #E0DED8;
+  --text: #1A1916;
+  --text2: #6B6960;
+  --text3: #9B998F;
+  --accent: #2D6A4F;
+  --accent-light: #D8EDE4;
+  --accent2: #E07A3A;
+  --accent2-light: #FDE8D8;
+  --accent3: #5B4FCF;
+  --accent3-light: #E8E5F9;
+  --red: #D94F3D;
+  --red-light: #FBEAE8;
+  --yellow: #E8A923;
+  --yellow-light: #FDF3DC;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 24px rgba(0,0,0,0.08);
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+[data-theme="dark"] {
+  --bg: #141412;
+  --surface: #1E1D1A;
+  --surface2: #272521;
+  --border: #333128;
+  --text: #F0EEE8;
+  --text2: #9B998F;
+  --text3: #6B6960;
+  --accent: #52B788;
+  --accent-light: #1A3329;
+  --accent2: #F4945C;
+  --accent2-light: #3A2016;
+  --accent3: #8B80E8;
+  --accent3-light: #221E4A;
+  --red: #E8695A;
+  --red-light: #3A1A16;
+  --yellow: #F2C05A;
+  --yellow-light: #3A2E0C;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2);
+  --shadow-md: 0 4px 24px rgba(0,0,0,0.4);
+}
+
+/* ===== RESET ===== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  transition: background 0.3s, color 0.3s;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== APP LAYOUT ===== */
+.app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+/* ===== GRIDS ===== */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.three-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
