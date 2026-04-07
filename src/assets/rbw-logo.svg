@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 140">
+  <!-- fundo preto -->
+  <rect width="110" height="140" rx="10" fill="#000"/>
+
+  <!-- globo wireframe -->
+  <circle cx="55" cy="42" r="26" fill="none" stroke="white" stroke-width="2.5"/>
+  <!-- equador -->
+  <line x1="29" y1="42" x2="81" y2="42" stroke="white" stroke-width="1.8"/>
+  <!-- paralelo superior -->
+  <path d="M36,29 Q55,24 74,29" fill="none" stroke="white" stroke-width="1.8"/>
+  <!-- paralelo inferior -->
+  <path d="M36,55 Q55,60 74,55" fill="none" stroke="white" stroke-width="1.8"/>
+  <!-- meridiano central (vertical) -->
+  <line x1="55" y1="16" x2="55" y2="68" stroke="white" stroke-width="1.8"/>
+  <!-- meridiano esquerdo (elipse) -->
+  <ellipse cx="55" cy="42" rx="13" ry="26" fill="none" stroke="white" stroke-width="1.8"/>
+  <!-- meridiano direito -->
+  <path d="M55,16 Q81,42 55,68" fill="none" stroke="white" stroke-width="1.8"/>
+
+  <!-- ROBER -->
+  <text x="55" y="90" font-family="Arial Black,Impact,sans-serif" font-weight="900"
+        font-size="17" fill="white" text-anchor="middle" letter-spacing="3">ROBER</text>
+
+  <!-- WORLD em laranja -->
+  <text x="55" y="111" font-family="Arial Black,Impact,sans-serif" font-weight="900"
+        font-size="17" fill="#FF6600" text-anchor="middle" letter-spacing="3">WORLD</text>
+
+  <!-- #DIGITAL -->
+  <text x="55" y="130" font-family="Arial Black,Impact,sans-serif" font-weight="900"
+        font-size="13" fill="white" text-anchor="middle" letter-spacing="2">#DIGITAL</text>
+</svg>
