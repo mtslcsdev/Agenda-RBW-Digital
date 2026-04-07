@@ -1,21 +1,10 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
+import NoteCard from '../components/ui/NoteCard'
 import NoteModal from '../components/NoteModal'
 
-const COLOR_CLASS = {
-  yellow: '',
-  blue: 'blue',
-  purple: 'purple',
-}
-
-function formatDate(iso) {
-  if (!iso) return ''
-  const [y, m, d] = iso.split('-')
-  return `${d}/${m}/${y}`
-}
-
 export default function Notas({ onNew }) {
-  const { notes, deleteNote } = useApp()
+  const { notes, deleteNote, searchQuery } = useApp()
   const [editingNote, setEditingNote] = useState(null)
   const [editOpen, setEditOpen] = useState(false)
 
@@ -24,51 +13,46 @@ export default function Notas({ onNew }) {
     setEditOpen(true)
   }
 
+  // Sort: pinned first, then by date desc
+  const sorted = [...notes].sort((a, b) => {
+    if (a.pinned && !b.pinned) return -1
+    if (!a.pinned && b.pinned) return 1
+    return b.date?.localeCompare(a.date || '') || 0
+  })
+
+  const filtered = searchQuery
+    ? sorted.filter(n =>
+        n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        n.content?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        n.project?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : sorted
+
   return (
     <>
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', alignItems: 'center' }}>
         <button className="btn btn-primary" onClick={onNew}>+ Nova Nota</button>
         <span style={{ fontSize: '12px', color: 'var(--text3)', alignSelf: 'center' }}>
-          {notes.length} nota{notes.length !== 1 ? 's' : ''}
+          {filtered.length} nota{filtered.length !== 1 ? 's' : ''}
+          {notes.filter(n => n.pinned).length > 0 && (
+            <span style={{ marginLeft: '6px' }}>· 📌 {notes.filter(n => n.pinned).length} fixada{notes.filter(n => n.pinned).length !== 1 ? 's' : ''}</span>
+          )}
         </span>
       </div>
 
-      {notes.length === 0 ? (
+      {filtered.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text3)' }}>
-          Nenhuma nota. Crie uma!
+          {searchQuery ? 'Nenhuma nota encontrada' : 'Nenhuma nota. Crie uma!'}
         </div>
       ) : (
         <div className="three-col">
-          {notes.map(note => (
-            <div
+          {filtered.map(note => (
+            <NoteCard
               key={note.id}
-              className={`note-card${COLOR_CLASS[note.color] ? ' ' + COLOR_CLASS[note.color] : ''}`}
-              style={note.color === 'purple' ? { background: 'var(--accent3-light)', borderColor: 'var(--accent3)' } : undefined}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                <strong style={{ fontSize: '12px' }}>{note.title}</strong>
-                <div style={{ display: 'flex', gap: '4px', marginLeft: '8px', flexShrink: 0 }}>
-                  <button
-                    className="btn-icon"
-                    style={{ width: '20px', height: '20px', fontSize: '10px' }}
-                    onClick={() => handleEdit(note)}
-                    title="Editar"
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    className="btn-icon"
-                    style={{ width: '20px', height: '20px', fontSize: '10px', color: 'var(--red)' }}
-                    onClick={() => deleteNote(note.id)}
-                    title="Excluir"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-              {note.content}
-              <div className="note-meta">📅 {formatDate(note.date)} · {note.project}</div>
-            </div>
+              note={note}
+              onEdit={handleEdit}
+              onDelete={deleteNote}
+            />
           ))}
         </div>
       )}

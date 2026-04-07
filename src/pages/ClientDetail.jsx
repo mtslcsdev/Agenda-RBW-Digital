@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import TaskItem from '../components/ui/TaskItem'
 import TaskTag from '../components/ui/TaskTag'
+import NoteCard from '../components/ui/NoteCard'
 
 const DEFAULT_PIPELINE = [
   { label: 'Onboarding', status: 'done' },
@@ -133,10 +134,8 @@ export default function ClientDetail({ onNewTask, onEditTask, onEditClient }) {
             <span className="card-title">Notas do Cliente</span>
           </div>
           {clientNotes.map(note => (
-            <div key={note.id} className={`note-card${note.color === 'blue' || note.color === 'purple' ? ' blue' : ''}`} style={{ marginBottom: '8px' }}>
-              <strong>{note.title}</strong><br />
-              {note.content}
-              <div className="note-meta">📅 {note.date} · Mateus</div>
+            <div key={note.id} style={{ marginBottom: '8px' }}>
+              <NoteCard note={note} showActions={false} />
             </div>
           ))}
           <div style={{ marginTop: '8px' }}>

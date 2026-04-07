@@ -11,6 +11,8 @@ export const TAG_OPTIONS = ['GHL', 'N8N', 'Vendas', 'Reunião', 'Dev', 'Pessoal'
 
 export const CLIENT_COLORS = ['#2D6A4F', '#5B4FCF', '#E07A3A', '#D94F3D', '#E8A923', '#3A7CA5']
 
+export const PRIORITY_COLORS = { Normal: null, Alta: 'var(--accent2)', Urgente: 'var(--red)' }
+
 const STATUS_OPTIONS = [
   { label: 'Em andamento', color: 'orange' },
   { label: 'Ativo', color: 'green' },
@@ -37,9 +39,31 @@ const SEED_CLIENTS = [
 ]
 
 const SEED_NOTES = [
-  { id: 1, title: '🔧 Neoprop – Webhook Rejeição', content: 'Mapear campo de motivo no webhook de rejeição. Verificar com Robervan a estrutura esperada para o Switch node dos 3 planos.', date: '2026-04-07', project: 'Neoprop', color: 'yellow' },
-  { id: 2, title: '🏃 Guia do Corredor – 5km', content: 'Preço: R$29,90 · Hotmart. Validar organicamente primeiro. Estrutura: aquecimento, treino base, progressão, recuperação.', date: '2026-04-06', project: 'Pessoal', color: 'blue' },
-  { id: 3, title: '📊 Meta Ads – Estudo', content: 'Sessões curtas diárias. Foco atual: estrutura de campanha, conjuntos de anúncios, públicos lookalike e retargeting.', date: '2026-04-05', project: 'Pessoal', color: 'purple' },
+  {
+    id: 1, title: '🔧 Neoprop – Webhook Rejeição',
+    content: 'Mapear campo de motivo no webhook de rejeição. Verificar com Robervan a estrutura esperada para o Switch node dos 3 planos.',
+    date: '2026-04-07', project: 'Neoprop', color: 'yellow',
+    type: 'text', items: [], pinned: false,
+  },
+  {
+    id: 2, title: '✅ Setup GHL – Checklist',
+    content: '',
+    date: '2026-04-06', project: 'Neoprop', color: 'blue',
+    type: 'checklist',
+    items: [
+      { id: 1, text: 'Criar conta no GoHighLevel', done: true },
+      { id: 2, text: 'Configurar subaccount Neoprop', done: true },
+      { id: 3, text: 'Conectar domínio personalizado', done: false },
+      { id: 4, text: 'Ativar automações de follow-up', done: false },
+    ],
+    pinned: true,
+  },
+  {
+    id: 3, title: '📊 Meta Ads – Estudo',
+    content: 'Sessões curtas diárias. Foco atual: estrutura de campanha, conjuntos de anúncios, públicos lookalike e retargeting.',
+    date: '2026-04-05', project: 'Pessoal', color: 'purple',
+    type: 'text', items: [], pinned: false,
+  },
 ]
 
 function loadFromStorage(key, fallback) {
@@ -102,13 +126,30 @@ export function AppProvider({ children }) {
 
   // ── NOTES ──
   function addNote(data) {
-    setNotesState(prev => [{ ...data, id: Date.now(), date: new Date().toISOString().slice(0, 10) }, ...prev])
+    setNotesState(prev => [{
+      ...data,
+      id: Date.now(),
+      date: new Date().toISOString().slice(0, 10),
+      type: data.type || 'text',
+      items: data.items || [],
+      pinned: false,
+    }, ...prev])
   }
   function editNote(id, data) {
     setNotesState(prev => prev.map(n => n.id === id ? { ...n, ...data } : n))
   }
   function deleteNote(id) {
     setNotesState(prev => prev.filter(n => n.id !== id))
+  }
+  function toggleNoteItem(noteId, itemId) {
+    setNotesState(prev => prev.map(n =>
+      n.id === noteId
+        ? { ...n, items: n.items.map(it => it.id === itemId ? { ...it, done: !it.done } : it) }
+        : n
+    ))
+  }
+  function pinNote(id) {
+    setNotesState(prev => prev.map(n => n.id === id ? { ...n, pinned: !n.pinned } : n))
   }
 
   const activeClients = clients.filter(c => !c.archived)
@@ -118,7 +159,7 @@ export function AppProvider({ children }) {
       theme, toggleTheme,
       tasks, addTask, editTask, deleteTask, toggleTask,
       clients: activeClients, allClients: clients, addClient, editClient, archiveClient,
-      notes, addNote, editNote, deleteNote,
+      notes, addNote, editNote, deleteNote, toggleNoteItem, pinNote,
       searchQuery, setSearchQuery,
     }}>
       {children}

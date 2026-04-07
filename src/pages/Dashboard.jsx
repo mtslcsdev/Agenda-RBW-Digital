@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import StatCard from '../components/ui/StatCard'
 import TaskItem from '../components/ui/TaskItem'
+import NoteCard from '../components/ui/NoteCard'
 import { clientSlug } from './ClientDetail'
 
 const scheduleItems = [
@@ -11,37 +12,34 @@ const scheduleItems = [
   { time: '16:00', title: 'Estudo Meta Ads', sub: '30 min · individual', bg: 'var(--surface2)', color: 'var(--text)' },
 ]
 
-function formatDate(iso) {
-  if (!iso) return ''
-  const [, m, d] = iso.split('-')
-  return `${d}/${m}`
-}
-
 export default function Dashboard({ onNewTask, onEditTask }) {
   const { tasks, toggleTask, deleteTask, clients, notes } = useApp()
   const navigate = useNavigate()
 
   const today = new Date().toISOString().slice(0, 10)
   const todayTasks = tasks.filter(t => t.date === today)
-  const allTodayTasks = todayTasks.length > 0 ? todayTasks : tasks.slice(0, 5)
+  const displayTasks = todayTasks.length > 0 ? todayTasks : tasks.slice(0, 5)
   const doneTasks = tasks.filter(t => t.done).length
-  const inProgressTasks = tasks.filter(t => !t.done).length
+  const pendingTasks = tasks.filter(t => !t.done).length
   const overdueTasks = tasks.filter(t => t.date < today && !t.done)
 
   const nextDeadline = tasks
     .filter(t => !t.done && t.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date))[0]
 
+  // Pinned notes first
+  const sortedNotes = [...notes].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
+
   return (
     <>
       <div className="stats-grid">
         <StatCard label="TAREFAS CONCLUÍDAS" value={doneTasks} sub="total até agora" variant="green" />
-        <StatCard label="EM ANDAMENTO" value={inProgressTasks} sub="aguardando ação" variant="orange" />
+        <StatCard label="EM ANDAMENTO" value={pendingTasks} sub="aguardando ação" variant="orange" />
         <StatCard label="CLIENTES ATIVOS" value={clients.length} sub={`${tasks.filter(t => t.date === today && !t.done).length} com tarefas hoje`} variant="purple" />
         <StatCard
           label={overdueTasks.length > 0 ? `⚠️ ATRASADAS (${overdueTasks.length})` : 'PRÓXIMO PRAZO'}
           value={nextDeadline ? nextDeadline.date.slice(8) + '/' + nextDeadline.date.slice(5, 7) : '—'}
-          sub={nextDeadline?.title?.slice(0, 30) || 'Sem prazo próximo'}
+          sub={nextDeadline?.title?.slice(0, 28) || 'Sem prazo próximo'}
           valueStyle={{ fontSize: '18px', paddingTop: '4px', color: overdueTasks.length > 0 ? 'var(--red)' : undefined }}
         />
       </div>
@@ -53,18 +51,19 @@ export default function Dashboard({ onNewTask, onEditTask }) {
             <span className="card-title">📋 Tarefas de Hoje</span>
             <button className="card-action" onClick={() => navigate('/tarefas')}>Ver todas</button>
           </div>
-          {allTodayTasks.length === 0 ? (
+          {displayTasks.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text3)', fontSize: '12px' }}>
               Nenhuma tarefa para hoje 🎉
             </div>
           ) : (
-            allTodayTasks.map(task => (
+            displayTasks.map(task => (
               <TaskItem
                 key={task.id}
                 task={task}
                 onToggle={toggleTask}
                 onEdit={onEditTask}
                 onDelete={deleteTask}
+                showDate
               />
             ))
           )}
@@ -111,22 +110,15 @@ export default function Dashboard({ onNewTask, onEditTask }) {
           ))}
         </div>
 
-        {/* Nota Rápida */}
+        {/* Notas Recentes */}
         <div className="card">
           <div className="card-header">
             <span className="card-title">◻ Notas Recentes</span>
             <button className="card-action" onClick={() => navigate('/notas')}>Ver todas</button>
           </div>
-          {notes.slice(0, 2).map((note, i) => (
-            <div
-              key={note.id}
-              className={`note-card${note.color === 'blue' || note.color === 'purple' ? ' blue' : ''}`}
-              style={{ marginTop: i > 0 ? '10px' : undefined, cursor: 'pointer' }}
-              onClick={() => navigate('/notas')}
-            >
-              <strong>{note.title}</strong><br />
-              {note.content.slice(0, 100)}{note.content.length > 100 ? '…' : ''}
-              <div className="note-meta">📅 {note.date} · {note.project}</div>
+          {sortedNotes.slice(0, 2).map((note, i) => (
+            <div key={note.id} style={{ marginTop: i > 0 ? '10px' : undefined }}>
+              <NoteCard note={note} showActions={false} preview />
             </div>
           ))}
           {notes.length === 0 && (
