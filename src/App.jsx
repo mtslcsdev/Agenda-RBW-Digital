@@ -4,11 +4,13 @@ import { AppProvider } from './context/AppContext'
 import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
 import TaskModal from './components/TaskModal'
+import ClientModal from './components/ClientModal'
+import NoteModal from './components/NoteModal'
 import Dashboard from './pages/Dashboard'
 import Agenda from './pages/Agenda'
 import Tarefas from './pages/Tarefas'
 import Clientes from './pages/Clientes'
-import Neoprop from './pages/Neoprop'
+import ClientDetail from './pages/ClientDetail'
 import Notas from './pages/Notas'
 
 const PAGE_TITLES = {
@@ -16,39 +18,104 @@ const PAGE_TITLES = {
   '/agenda': 'Agenda',
   '/tarefas': 'Tarefas',
   '/clientes': 'Clientes',
-  '/clientes/neoprop': 'Neoprop',
   '/notas': 'Notas & Documentos',
 }
 
+const NEW_LABELS = {
+  '/tarefas': '+ Tarefa',
+  '/clientes': '+ Cliente',
+  '/notas': '+ Nota',
+}
+
 function AppLayout() {
-  const [modalOpen, setModalOpen] = useState(false)
   const { pathname } = useLocation()
-  const title = PAGE_TITLES[pathname] || 'FlowDesk'
+
+  // Task modal
+  const [taskOpen, setTaskOpen] = useState(false)
+  const [editingTask, setEditingTask] = useState(null)
+
+  // Client modal
+  const [clientOpen, setClientOpen] = useState(false)
+  const [editingClient, setEditingClient] = useState(null)
+
+  // Note modal
+  const [noteOpen, setNoteOpen] = useState(false)
+
+  function openNewTask() { setEditingTask(null); setTaskOpen(true) }
+  function openEditTask(task) { setEditingTask(task); setTaskOpen(true) }
+  function openNewClient() { setEditingClient(null); setClientOpen(true) }
+  function openEditClient(client) { setEditingClient(client); setClientOpen(true) }
+  function openNewNote() { setNoteOpen(true) }
+
+  function handleTopbarNew() {
+    if (pathname === '/clientes' || pathname.startsWith('/clientes/')) openNewClient()
+    else if (pathname === '/notas') openNewNote()
+    else openNewTask()
+  }
+
+  const isClientDetail = pathname.startsWith('/clientes/') && pathname !== '/clientes'
+  const pageTitle = isClientDetail
+    ? undefined  // ClientDetail renders its own header
+    : (PAGE_TITLES[pathname] || 'FlowDesk')
+
+  const newLabel = NEW_LABELS[pathname] || (pathname.startsWith('/clientes/') ? '+ Tarefa' : '+ Novo')
 
   return (
     <div className="app">
       <Sidebar />
       <div className="main">
-        <Topbar title={title} onNew={() => setModalOpen(true)} />
+        {!isClientDetail && (
+          <Topbar title={pageTitle} onNew={handleTopbarNew} newLabel={newLabel} />
+        )}
+        {isClientDetail && (
+          <Topbar
+            title={pageTitle || ''}
+            onNew={pathname.startsWith('/clientes/') ? openNewTask : handleTopbarNew}
+            newLabel="+ Tarefa"
+          />
+        )}
         <div className="content">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<Dashboard onNewTask={openNewTask} onEditTask={openEditTask} />} />
             <Route path="/agenda" element={<Agenda />} />
-            <Route path="/tarefas" element={<Tarefas onNew={() => setModalOpen(true)} />} />
-            <Route path="/clientes" element={<Clientes onNew={() => setModalOpen(true)} />} />
-            <Route path="/clientes/neoprop" element={<Neoprop />} />
-            <Route path="/notas" element={<Notas onNew={() => setModalOpen(true)} />} />
+            <Route path="/tarefas" element={<Tarefas onNew={openNewTask} onEdit={openEditTask} />} />
+            <Route path="/clientes" element={<Clientes onNew={openNewClient} onEdit={openEditClient} />} />
+            <Route
+              path="/clientes/:id"
+              element={
+                <ClientDetail
+                  onNewTask={openNewTask}
+                  onEditTask={openEditTask}
+                  onEditClient={openEditClient}
+                />
+              }
+            />
+            <Route path="/notas" element={<Notas onNew={openNewNote} />} />
           </Routes>
         </div>
       </div>
-      <TaskModal open={modalOpen} onClose={() => setModalOpen(false)} />
+
+      <TaskModal
+        open={taskOpen}
+        onClose={() => { setTaskOpen(false); setEditingTask(null) }}
+        editingTask={editingTask}
+      />
+      <ClientModal
+        open={clientOpen}
+        onClose={() => { setClientOpen(false); setEditingClient(null) }}
+        editingClient={editingClient}
+      />
+      <NoteModal
+        open={noteOpen}
+        onClose={() => setNoteOpen(false)}
+      />
     </div>
   )
 }
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/Agenda-RBW-Digital">
       <AppProvider>
         <AppLayout />
       </AppProvider>

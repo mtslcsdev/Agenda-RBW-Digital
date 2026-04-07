@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import StatCard from '../components/ui/StatCard'
 import TaskItem from '../components/ui/TaskItem'
-import TaskTag from '../components/ui/TaskTag'
+import { clientSlug } from './ClientDetail'
 
 const scheduleItems = [
   { time: '09:00', title: 'Daily – Operações', sub: '30 min · com Robervan', bg: 'var(--accent-light)', color: 'var(--accent)' },
@@ -11,25 +11,38 @@ const scheduleItems = [
   { time: '16:00', title: 'Estudo Meta Ads', sub: '30 min · individual', bg: 'var(--surface2)', color: 'var(--text)' },
 ]
 
-export default function Dashboard() {
-  const { tasks, toggleTask, clients, notes } = useApp()
+function formatDate(iso) {
+  if (!iso) return ''
+  const [, m, d] = iso.split('-')
+  return `${d}/${m}`
+}
+
+export default function Dashboard({ onNewTask, onEditTask }) {
+  const { tasks, toggleTask, deleteTask, clients, notes } = useApp()
   const navigate = useNavigate()
 
-  const todayTasks = tasks.slice(0, 5)
+  const today = new Date().toISOString().slice(0, 10)
+  const todayTasks = tasks.filter(t => t.date === today)
+  const allTodayTasks = todayTasks.length > 0 ? todayTasks : tasks.slice(0, 5)
   const doneTasks = tasks.filter(t => t.done).length
   const inProgressTasks = tasks.filter(t => !t.done).length
+  const overdueTasks = tasks.filter(t => t.date < today && !t.done)
+
+  const nextDeadline = tasks
+    .filter(t => !t.done && t.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))[0]
 
   return (
     <>
       <div className="stats-grid">
-        <StatCard label="TAREFAS CONCLUÍDAS" value={doneTasks} sub="esta semana" variant="green" />
+        <StatCard label="TAREFAS CONCLUÍDAS" value={doneTasks} sub="total até agora" variant="green" />
         <StatCard label="EM ANDAMENTO" value={inProgressTasks} sub="aguardando ação" variant="orange" />
-        <StatCard label="CLIENTES ATIVOS" value={clients.length} sub="3 com tarefas hoje" variant="purple" />
+        <StatCard label="CLIENTES ATIVOS" value={clients.length} sub={`${tasks.filter(t => t.date === today && !t.done).length} com tarefas hoje`} variant="purple" />
         <StatCard
-          label="PRÓXIMO PRAZO"
-          value="Qua 09"
-          sub="Contrato Neoprop"
-          valueStyle={{ fontSize: '18px', paddingTop: '4px' }}
+          label={overdueTasks.length > 0 ? `⚠️ ATRASADAS (${overdueTasks.length})` : 'PRÓXIMO PRAZO'}
+          value={nextDeadline ? nextDeadline.date.slice(8) + '/' + nextDeadline.date.slice(5, 7) : '—'}
+          sub={nextDeadline?.title?.slice(0, 30) || 'Sem prazo próximo'}
+          valueStyle={{ fontSize: '18px', paddingTop: '4px', color: overdueTasks.length > 0 ? 'var(--red)' : undefined }}
         />
       </div>
 
@@ -40,9 +53,21 @@ export default function Dashboard() {
             <span className="card-title">📋 Tarefas de Hoje</span>
             <button className="card-action" onClick={() => navigate('/tarefas')}>Ver todas</button>
           </div>
-          {todayTasks.map(task => (
-            <TaskItem key={task.id} task={task} onToggle={toggleTask} />
-          ))}
+          {allTodayTasks.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text3)', fontSize: '12px' }}>
+              Nenhuma tarefa para hoje 🎉
+            </div>
+          ) : (
+            allTodayTasks.map(task => (
+              <TaskItem
+                key={task.id}
+                task={task}
+                onToggle={toggleTask}
+                onEdit={onEditTask}
+                onDelete={deleteTask}
+              />
+            ))
+          )}
         </div>
 
         {/* Agenda de Hoje */}
@@ -70,16 +95,16 @@ export default function Dashboard() {
             <span className="card-title">◉ Clientes</span>
             <button className="card-action" onClick={() => navigate('/clientes')}>Ver todos</button>
           </div>
-          {clients.map(client => (
+          {clients.slice(0, 4).map(client => (
             <div
               key={client.id}
               className="client-item"
-              onClick={() => client.name === 'Neoprop' ? navigate('/clientes/neoprop') : undefined}
+              onClick={() => navigate(`/clientes/${clientSlug(client.name)}`)}
             >
               <div className="client-avatar" style={{ background: client.color }}>{client.initials}</div>
               <div className="client-info">
                 <p>{client.name}</p>
-                <span>{client.segment} · {client.taskCount} tarefas</span>
+                <span>{client.segment} · {tasks.filter(t => t.client === client.name).length} tarefas</span>
               </div>
               <span className={`client-status task-tag tag-${client.statusColor}`}>{client.status}</span>
             </div>
@@ -89,20 +114,26 @@ export default function Dashboard() {
         {/* Nota Rápida */}
         <div className="card">
           <div className="card-header">
-            <span className="card-title">◻ Nota Rápida</span>
-            <button className="card-action" onClick={() => navigate('/notas')}>Nova nota</button>
+            <span className="card-title">◻ Notas Recentes</span>
+            <button className="card-action" onClick={() => navigate('/notas')}>Ver todas</button>
           </div>
-          {notes.slice(0, 2).map(note => (
+          {notes.slice(0, 2).map((note, i) => (
             <div
               key={note.id}
               className={`note-card${note.color === 'blue' || note.color === 'purple' ? ' blue' : ''}`}
-              style={{ marginTop: note.id > 1 ? '10px' : undefined }}
+              style={{ marginTop: i > 0 ? '10px' : undefined, cursor: 'pointer' }}
+              onClick={() => navigate('/notas')}
             >
               <strong>{note.title}</strong><br />
-              {note.content}
-              <div className="note-meta">📅 {note.date} · Mateus</div>
+              {note.content.slice(0, 100)}{note.content.length > 100 ? '…' : ''}
+              <div className="note-meta">📅 {note.date} · {note.project}</div>
             </div>
           ))}
+          {notes.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text3)', fontSize: '12px' }}>
+              Nenhuma nota ainda
+            </div>
+          )}
         </div>
       </div>
     </>

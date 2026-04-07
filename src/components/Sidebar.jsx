@@ -1,8 +1,12 @@
 import { NavLink } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
+import { clientSlug } from '../pages/ClientDetail'
 
 export default function Sidebar() {
-  const { theme, toggleTheme } = useApp()
+  const { theme, toggleTheme, clients, tasks } = useApp()
+  const today = new Date().toISOString().slice(0, 10)
+  const overdueCount = tasks.filter(t => t.date < today && !t.done).length
+  const todayCount = tasks.filter(t => t.date === today && !t.done).length
 
   return (
     <aside className="sidebar">
@@ -18,21 +22,33 @@ export default function Sidebar() {
         </NavLink>
         <NavLink to="/agenda" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
           <span className="icon">📅</span> Agenda
-          <span className="badge">3</span>
+          {todayCount > 0 && <span className="badge">{todayCount}</span>}
         </NavLink>
         <NavLink to="/tarefas" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
           <span className="icon">✓</span> Tarefas
+          {overdueCount > 0 && (
+            <span className="badge" style={{ background: 'var(--red)' }}>{overdueCount}</span>
+          )}
         </NavLink>
       </nav>
 
       <nav className="nav-section" style={{ marginTop: '8px' }}>
         <div className="nav-label">Clientes</div>
-        <NavLink to="/clientes" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+        <NavLink to="/clientes" end className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
           <span className="icon">◉</span> Todos os Clientes
         </NavLink>
-        <NavLink to="/clientes/neoprop" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
-          <span className="icon">▸</span> Neoprop
-        </NavLink>
+        {clients.map(client => (
+          <NavLink
+            key={client.id}
+            to={`/clientes/${clientSlug(client.name)}`}
+            className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+          >
+            <span className="icon">▸</span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {client.name}
+            </span>
+          </NavLink>
+        ))}
       </nav>
 
       <nav className="nav-section" style={{ marginTop: '8px' }}>
