@@ -11,8 +11,21 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="logo">
-        <h1>Flow<span>Desk</span></h1>
-        <p>Gestão de Operações</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className="logo-globe">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <ellipse cx="12" cy="12" rx="4.5" ry="10"/>
+              <line x1="2" y1="12" x2="22" y2="12"/>
+              <line x1="3.5" y1="7" x2="20.5" y2="7"/>
+              <line x1="3.5" y1="17" x2="20.5" y2="17"/>
+            </svg>
+          </div>
+          <div>
+            <h1>RBW <span>DIGITAL</span></h1>
+            <p>Gestão de Operações</p>
+          </div>
+        </div>
       </div>
 
       <nav className="nav-section">
