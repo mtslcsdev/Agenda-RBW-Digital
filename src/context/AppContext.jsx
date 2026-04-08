@@ -13,6 +13,12 @@ export const CLIENT_COLORS = ['#2D6A4F', '#5B4FCF', '#E07A3A', '#D94F3D', '#E8A9
 
 export const PRIORITY_COLORS = { Normal: null, Alta: 'var(--accent2)', Urgente: 'var(--red)' }
 
+export const KANBAN_COLUMNS = [
+  { id: 'pendente', label: 'Pendente', color: 'var(--text3)' },
+  { id: 'em-progresso', label: 'Em Progresso', color: 'var(--accent3)' },
+  { id: 'concluido', label: 'Concluído', color: 'var(--accent)' },
+]
+
 const STATUS_OPTIONS = [
   { label: 'Em andamento', color: 'orange' },
   { label: 'Ativo', color: 'green' },
@@ -23,13 +29,13 @@ const STATUS_OPTIONS = [
 export { STATUS_OPTIONS }
 
 const SEED_TASKS = [
-  { id: 1, title: 'Configurar webhook N8N – Neoprop', done: true, tag: 'GHL', tagColor: 'green', client: 'Neoprop', date: '2026-04-07', priority: 'Normal' },
-  { id: 2, title: 'Revisar fluxo de aprovação de trader', done: false, tag: 'N8N', tagColor: 'orange', client: 'Neoprop', date: '2026-04-08', priority: 'Alta' },
-  { id: 3, title: 'Switch node – 3 planos Asaas', done: false, tag: 'N8N', tagColor: 'orange', client: 'Neoprop', date: '2026-04-09', priority: 'Urgente' },
-  { id: 4, title: 'Enviar proposta para novo cliente', done: false, tag: 'Vendas', tagColor: 'purple', client: 'Pessoal', date: '2026-04-10', priority: 'Normal' },
-  { id: 5, title: 'Reunião com Joy – engajamento de leads', done: false, tag: 'Reunião', tagColor: 'yellow', client: 'Pessoal', date: '2026-04-08', priority: 'Normal' },
-  { id: 6, title: 'Rascunho capítulo 1 – Ebook 5km', done: false, tag: 'Pessoal', tagColor: 'purple', client: 'Pessoal', date: '2026-04-11', priority: 'Normal' },
-  { id: 7, title: 'Checar integração Asaas API', done: true, tag: 'Dev', tagColor: 'green', client: 'Neoprop', date: '2026-04-07', priority: 'Normal' },
+  { id: 1, title: 'Configurar webhook N8N – Neoprop', done: true, tag: 'GHL', tagColor: 'green', client: 'Neoprop', date: '2026-04-07', priority: 'Normal', taskStatus: 'concluido' },
+  { id: 2, title: 'Revisar fluxo de aprovação de trader', done: false, tag: 'N8N', tagColor: 'orange', client: 'Neoprop', date: '2026-04-08', priority: 'Alta', taskStatus: 'em-progresso' },
+  { id: 3, title: 'Switch node – 3 planos Asaas', done: false, tag: 'N8N', tagColor: 'orange', client: 'Neoprop', date: '2026-04-09', priority: 'Urgente', taskStatus: 'pendente' },
+  { id: 4, title: 'Enviar proposta para novo cliente', done: false, tag: 'Vendas', tagColor: 'purple', client: 'Pessoal', date: '2026-04-10', priority: 'Normal', taskStatus: 'pendente' },
+  { id: 5, title: 'Reunião com Joy – engajamento de leads', done: false, tag: 'Reunião', tagColor: 'yellow', client: 'Pessoal', date: '2026-04-08', priority: 'Normal', taskStatus: 'pendente' },
+  { id: 6, title: 'Rascunho capítulo 1 – Ebook 5km', done: false, tag: 'Pessoal', tagColor: 'purple', client: 'Pessoal', date: '2026-04-11', priority: 'Normal', taskStatus: 'pendente' },
+  { id: 7, title: 'Checar integração Asaas API', done: true, tag: 'Dev', tagColor: 'green', client: 'Neoprop', date: '2026-04-07', priority: 'Normal', taskStatus: 'concluido' },
 ]
 
 const SEED_CLIENTS = [
@@ -101,7 +107,7 @@ export function AppProvider({ children }) {
 
   // ── TASKS ──
   function addTask(data) {
-    setTasksState(prev => [{ ...data, id: Date.now(), done: false }, ...prev])
+    setTasksState(prev => [{ ...data, id: Date.now(), done: false, taskStatus: data.taskStatus || 'pendente' }, ...prev])
   }
   function editTask(id, data) {
     setTasksState(prev => prev.map(t => t.id === id ? { ...t, ...data } : t))
@@ -110,7 +116,17 @@ export function AppProvider({ children }) {
     setTasksState(prev => prev.filter(t => t.id !== id))
   }
   function toggleTask(id) {
-    setTasksState(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t))
+    setTasksState(prev => prev.map(t => {
+      if (t.id !== id) return t
+      const done = !t.done
+      return { ...t, done, taskStatus: done ? 'concluido' : 'pendente' }
+    }))
+  }
+  function moveTask(id, newStatus) {
+    setTasksState(prev => prev.map(t => {
+      if (t.id !== id) return t
+      return { ...t, taskStatus: newStatus, done: newStatus === 'concluido' }
+    }))
   }
 
   // ── CLIENTS ──
@@ -157,7 +173,7 @@ export function AppProvider({ children }) {
   return (
     <AppContext.Provider value={{
       theme, toggleTheme,
-      tasks, addTask, editTask, deleteTask, toggleTask,
+      tasks, addTask, editTask, deleteTask, toggleTask, moveTask,
       clients: activeClients, allClients: clients, addClient, editClient, archiveClient,
       notes, addNote, editNote, deleteNote, toggleNoteItem, pinNote,
       searchQuery, setSearchQuery,

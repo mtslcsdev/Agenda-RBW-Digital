@@ -113,3 +113,15 @@ body {
   gap: 16px;
   margin-bottom: 16px;
 }
+
+/* ===== MOBILE LAYOUT ===== */
+@media (max-width: 768px) {
+  .app {
+    overflow: visible;
+  }
+
+  .main {
+    margin-left: 0 !important;
+    width: 100%;
+  }
+}

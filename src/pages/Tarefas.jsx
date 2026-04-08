@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import TaskItem from '../components/ui/TaskItem'
+import KanbanBoard from '../components/ui/KanbanBoard'
 
-const TABS = ['Todas', 'Hoje', 'Semana', 'Atrasadas']
+const TABS = ['Todas', 'Hoje', 'Semana', 'Atrasadas', 'Quadro']
 
 function getWeekRange() {
   const today = new Date()
@@ -87,24 +88,28 @@ export default function Tarefas({ onNew, onEdit }) {
         </div>
       </div>
 
-      <div className="card">
-        {filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text3)', fontSize: '13px' }}>
-            Nenhuma tarefa encontrada
-          </div>
-        ) : (
-          filtered.map(task => (
-            <TaskItem
-              key={task.id}
-              task={task}
-              onToggle={toggleTask}
-              onEdit={onEdit}
-              onDelete={deleteTask}
-              showDate
-            />
-          ))
-        )}
-      </div>
+      {activeTab === 'Quadro' ? (
+        <KanbanBoard tasks={filtered} onNew={onNew} onEdit={onEdit} />
+      ) : (
+        <div className="card">
+          {filtered.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text3)', fontSize: '13px' }}>
+              Nenhuma tarefa encontrada
+            </div>
+          ) : (
+            filtered.map(task => (
+              <TaskItem
+                key={task.id}
+                task={task}
+                onToggle={toggleTask}
+                onEdit={onEdit}
+                onDelete={deleteTask}
+                showDate
+              />
+            ))
+          )}
+        </div>
+      )}
     </>
   )
 }

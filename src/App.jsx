@@ -30,6 +30,9 @@ const NEW_LABELS = {
 function AppLayout() {
   const { pathname } = useLocation()
 
+  // Sidebar mobile
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
   // Task modal
   const [taskOpen, setTaskOpen] = useState(false)
   const [editingTask, setEditingTask] = useState(null)
@@ -62,16 +65,17 @@ function AppLayout() {
 
   return (
     <div className="app">
-      <Sidebar />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="main">
         {!isClientDetail && (
-          <Topbar title={pageTitle} onNew={handleTopbarNew} newLabel={newLabel} />
+          <Topbar title={pageTitle} onNew={handleTopbarNew} newLabel={newLabel} onMenuToggle={() => setSidebarOpen(o => !o)} />
         )}
         {isClientDetail && (
           <Topbar
             title={pageTitle || ''}
             onNew={pathname.startsWith('/clientes/') ? openNewTask : handleTopbarNew}
             newLabel="+ Tarefa"
+            onMenuToggle={() => setSidebarOpen(o => !o)}
           />
         )}
         <div className="content">

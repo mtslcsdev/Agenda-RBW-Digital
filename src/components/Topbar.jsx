@@ -1,10 +1,11 @@
 import { useApp } from '../context/AppContext'
 
-export default function Topbar({ title, onNew, newLabel = '+ Novo' }) {
+export default function Topbar({ title, onNew, newLabel = '+ Novo', onMenuToggle }) {
   const { searchQuery, setSearchQuery } = useApp()
 
   return (
     <div className="topbar">
+      <button className="hamburger" onClick={onMenuToggle} aria-label="Menu">☰</button>
       <h2>{title}</h2>
       <div className="topbar-actions">
         <div className="search-bar">
