@@ -932,6 +932,34 @@
   overflow-y: auto;
 }
 
+/* Drag & drop feedback */
+.kanban-board.dragging .kanban-col {
+  outline: 2px dashed transparent;
+  transition: outline-color 0.15s, background 0.15s;
+}
+
+.kanban-col.drag-over {
+  outline: 2px dashed var(--accent);
+  background: var(--accent-light);
+}
+
+.kanban-card {
+  cursor: grab;
+}
+
+.kanban-card:active {
+  cursor: grabbing;
+  opacity: 0.6;
+  transform: scale(0.98);
+}
+
+.kanban-empty.drag-target {
+  color: var(--accent);
+  border: 2px dashed var(--accent);
+  border-radius: 8px;
+  background: var(--accent-light);
+}
+
 .kanban-empty {
   text-align: center;
   padding: 20px 8px;

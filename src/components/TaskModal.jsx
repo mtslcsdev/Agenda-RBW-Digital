@@ -30,6 +30,7 @@ export default function TaskModal({ open, onClose, editingTask = null }) {
   function handleSubmit(e) {
     e.preventDefault()
     const fd = new FormData(e.target)
+    const taskStatus = fd.get('taskStatus') || 'pendente'
     const data = {
       title: fd.get('title'),
       client: fd.get('client'),
@@ -38,6 +39,8 @@ export default function TaskModal({ open, onClose, editingTask = null }) {
       notes: fd.get('notes'),
       tag: selectedTag,
       tagColor: TAG_COLORS[selectedTag] || 'green',
+      taskStatus,
+      done: taskStatus === 'concluido',
     }
     if (isEdit) {
       editTask(editingTask.id, data)
@@ -112,6 +115,14 @@ export default function TaskModal({ open, onClose, editingTask = null }) {
                 ))}
               </select>
             </div>
+          </div>
+          <div className="form-group">
+            <label>STATUS NO QUADRO</label>
+            <select name="taskStatus" defaultValue={editingTask?.taskStatus || 'pendente'} key={editingTask?.id ?? 'new-status'}>
+              <option value="pendente">○ Pendente</option>
+              <option value="em-progresso">◑ Em Progresso</option>
+              <option value="concluido">● Concluído</option>
+            </select>
           </div>
           <div className="form-group">
             <label>NOTAS</label>

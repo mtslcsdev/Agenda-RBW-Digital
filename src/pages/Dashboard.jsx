@@ -19,8 +19,16 @@ export default function Dashboard({ onNewTask, onEditTask }) {
   const today = new Date().toISOString().slice(0, 10)
   const todayTasks = tasks.filter(t => t.date === today)
   const displayTasks = todayTasks.length > 0 ? todayTasks : tasks.slice(0, 5)
-  const doneTasks = tasks.filter(t => t.done).length
-  const pendingTasks = tasks.filter(t => !t.done).length
+
+  const getStatus = t => t.taskStatus || (t.done ? 'concluido' : 'pendente')
+  const concluidas = tasks.filter(t => getStatus(t) === 'concluido').length
+  const emProgresso = tasks.filter(t => getStatus(t) === 'em-progresso').length
+  const pendentes = tasks.filter(t => getStatus(t) === 'pendente').length
+  const total = tasks.length
+  const progressPct = total > 0 ? Math.round((concluidas / total) * 100) : 0
+
+  const doneTasks = concluidas
+  const pendingTasks = emProgresso + pendentes
   const overdueTasks = tasks.filter(t => t.date < today && !t.done)
 
   const nextDeadline = tasks
@@ -33,8 +41,8 @@ export default function Dashboard({ onNewTask, onEditTask }) {
   return (
     <>
       <div className="stats-grid">
-        <StatCard label="TAREFAS CONCLUÍDAS" value={doneTasks} sub="total até agora" variant="green" />
-        <StatCard label="EM ANDAMENTO" value={pendingTasks} sub="aguardando ação" variant="orange" />
+        <StatCard label="CONCLUÍDAS" value={doneTasks} sub={`${progressPct}% do total`} variant="green" />
+        <StatCard label="EM PROGRESSO" value={emProgresso} sub="em andamento" variant="orange" />
         <StatCard label="CLIENTES ATIVOS" value={clients.length} sub={`${tasks.filter(t => t.date === today && !t.done).length} com tarefas hoje`} variant="purple" />
         <StatCard
           label={overdueTasks.length > 0 ? `⚠️ ATRASADAS (${overdueTasks.length})` : 'PRÓXIMO PRAZO'}
@@ -42,6 +50,33 @@ export default function Dashboard({ onNewTask, onEditTask }) {
           sub={nextDeadline?.title?.slice(0, 28) || 'Sem prazo próximo'}
           valueStyle={{ fontSize: '18px', paddingTop: '4px', color: overdueTasks.length > 0 ? 'var(--red)' : undefined }}
         />
+      </div>
+
+      {/* Progress bar */}
+      <div className="card" style={{ marginBottom: '16px', padding: '14px 18px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text2)', letterSpacing: '0.5px' }}>PROGRESSO GERAL</span>
+          <span style={{ fontSize: '12px', color: 'var(--text3)' }}>
+            {concluidas} de {total} tarefas · {emProgresso} em progresso · {pendentes} pendentes
+          </span>
+        </div>
+        <div style={{ background: 'var(--surface2)', borderRadius: '8px', height: '8px', overflow: 'hidden' }}>
+          <div style={{
+            height: '100%', borderRadius: '8px',
+            background: `linear-gradient(90deg, var(--accent) ${progressPct}%, var(--accent2) ${progressPct}%)`,
+            width: `${Math.max(progressPct, emProgresso > 0 ? Math.round(((concluidas + emProgresso) / total) * 100) : 0)}%`,
+            transition: 'width 0.4s ease',
+          }} />
+        </div>
+        <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
+          <span style={{ fontSize: '11px', color: 'var(--accent)' }}>● Concluído {progressPct}%</span>
+          {emProgresso > 0 && (
+            <span style={{ fontSize: '11px', color: 'var(--accent2)' }}>● Em Progresso {Math.round((emProgresso / total) * 100)}%</span>
+          )}
+          {pendentes > 0 && (
+            <span style={{ fontSize: '11px', color: 'var(--text3)' }}>○ Pendente {Math.round((pendentes / total) * 100)}%</span>
+          )}
+        </div>
       </div>
 
       <div className="two-col">

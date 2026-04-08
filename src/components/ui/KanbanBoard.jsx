@@ -22,22 +22,21 @@ const COLUMN_ICONS = {
   'concluido': '●',
 }
 
-const NEXT_STATUS = {
-  'pendente': 'em-progresso',
-  'em-progresso': 'concluido',
-  'concluido': null,
-}
-
-function KanbanCard({ task, onEdit, col }) {
+function KanbanCard({ task, onEdit, onDragStart }) {
   const { moveTask, deleteTask } = useApp()
   const [hovered, setHovered] = useState(false)
   const rel = getRelativeDate(task.date)
   const priorityColor = PRIORITY_COLORS[task.priority]
-  const nextStatus = NEXT_STATUS[col.id]
 
   return (
     <div
       className="kanban-card"
+      draggable
+      onDragStart={e => {
+        e.dataTransfer.setData('taskId', String(task.id))
+        e.dataTransfer.effectAllowed = 'move'
+        onDragStart?.()
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -71,16 +70,6 @@ function KanbanCard({ task, onEdit, col }) {
               ✏️
             </button>
           )}
-          {nextStatus && (
-            <button
-              className="btn-icon"
-              style={{ width: '24px', height: '24px', fontSize: '11px' }}
-              onClick={e => { e.stopPropagation(); moveTask(task.id, nextStatus) }}
-              title={`Mover para ${KANBAN_COLUMNS.find(c => c.id === nextStatus)?.label}`}
-            >
-              →
-            </button>
-          )}
           <button
             className="btn-icon"
             style={{ width: '24px', height: '24px', fontSize: '11px', color: 'var(--red)' }}
@@ -95,39 +84,110 @@ function KanbanCard({ task, onEdit, col }) {
   )
 }
 
-export default function KanbanBoard({ tasks, onNew, onEdit }) {
+export default function KanbanBoard({ tasks, onNew, onEdit, clientFilter, onClientFilterChange, clients }) {
+  const { moveTask } = useApp()
+  const [dragOverCol, setDragOverCol] = useState(null)
+  const [dragging, setDragging] = useState(false)
+
   const getTaskStatus = (task) => task.taskStatus || (task.done ? 'concluido' : 'pendente')
 
+  function handleDrop(e, colId) {
+    e.preventDefault()
+    const taskId = parseInt(e.dataTransfer.getData('taskId'), 10)
+    if (!isNaN(taskId)) moveTask(taskId, colId)
+    setDragOverCol(null)
+    setDragging(false)
+  }
+
+  function handleDragOver(e, colId) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverCol(colId)
+  }
+
   return (
-    <div className="kanban-board">
-      {KANBAN_COLUMNS.map(col => {
-        const colTasks = tasks.filter(t => getTaskStatus(t) === col.id)
-        return (
-          <div key={col.id} className="kanban-col">
-            <div className="kanban-col-header">
-              <span className="kanban-col-icon" style={{ color: col.color }}>
-                {COLUMN_ICONS[col.id]}
-              </span>
-              <span className="kanban-col-label">{col.label.toUpperCase()}</span>
-              <span className="kanban-col-count">{colTasks.length}</span>
-            </div>
-
-            <div className="kanban-col-body">
-              {colTasks.length === 0 ? (
-                <div className="kanban-empty">Nenhuma tarefa</div>
-              ) : (
-                colTasks.map(task => (
-                  <KanbanCard key={task.id} task={task} onEdit={onEdit} col={col} />
-                ))
-              )}
-            </div>
-
-            <button className="kanban-add-btn" onClick={onNew}>
-              + Adicionar Tarefa
+    <div>
+      {/* Client filter bar */}
+      {clients && clients.length > 0 && (
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text3)', marginRight: '2px' }}>Cliente:</span>
+          <button
+            className={`task-tag${clientFilter === '' ? ' tag-green' : ''}`}
+            style={{ cursor: 'pointer', padding: '4px 10px', border: clientFilter === '' ? '1px solid currentColor' : '1px solid var(--border)', background: clientFilter === '' ? undefined : 'transparent', color: clientFilter === '' ? undefined : 'var(--text2)' }}
+            onClick={() => onClientFilterChange('')}
+          >
+            Todos
+          </button>
+          {clients.map(c => (
+            <button
+              key={c.id}
+              className={`task-tag${clientFilter === c.name ? ' tag-green' : ''}`}
+              style={{ cursor: 'pointer', padding: '4px 10px', border: clientFilter === c.name ? '1px solid currentColor' : '1px solid var(--border)', background: clientFilter === c.name ? undefined : 'transparent', color: clientFilter === c.name ? undefined : 'var(--text2)' }}
+              onClick={() => onClientFilterChange(c.name === clientFilter ? '' : c.name)}
+            >
+              {c.name}
             </button>
-          </div>
-        )
-      })}
+          ))}
+          <button
+            className={`task-tag${clientFilter === 'Pessoal' ? ' tag-green' : ''}`}
+            style={{ cursor: 'pointer', padding: '4px 10px', border: clientFilter === 'Pessoal' ? '1px solid currentColor' : '1px solid var(--border)', background: clientFilter === 'Pessoal' ? undefined : 'transparent', color: clientFilter === 'Pessoal' ? undefined : 'var(--text2)' }}
+            onClick={() => onClientFilterChange(clientFilter === 'Pessoal' ? '' : 'Pessoal')}
+          >
+            Pessoal
+          </button>
+        </div>
+      )}
+
+      <div className={`kanban-board${dragging ? ' dragging' : ''}`}>
+        {KANBAN_COLUMNS.map(col => {
+          const colTasks = tasks.filter(t => {
+            if (getTaskStatus(t) !== col.id) return false
+            if (clientFilter && t.client !== clientFilter) return false
+            return true
+          })
+          const isOver = dragOverCol === col.id
+
+          return (
+            <div
+              key={col.id}
+              className={`kanban-col${isOver ? ' drag-over' : ''}`}
+              onDragOver={e => handleDragOver(e, col.id)}
+              onDragLeave={() => setDragOverCol(null)}
+              onDrop={e => handleDrop(e, col.id)}
+            >
+              <div className="kanban-col-header">
+                <span className="kanban-col-icon" style={{ color: col.color }}>
+                  {COLUMN_ICONS[col.id]}
+                </span>
+                <span className="kanban-col-label">{col.label.toUpperCase()}</span>
+                <span className="kanban-col-count">{colTasks.length}</span>
+              </div>
+
+              <div className="kanban-col-body">
+                {colTasks.length === 0 ? (
+                  <div className={`kanban-empty${isOver ? ' drag-target' : ''}`}>
+                    {isOver ? 'Soltar aqui' : 'Nenhuma tarefa'}
+                  </div>
+                ) : (
+                  colTasks.map(task => (
+                    <KanbanCard
+                      key={task.id}
+                      task={task}
+                      onEdit={onEdit}
+                      col={col}
+                      onDragStart={() => setDragging(true)}
+                    />
+                  ))
+                )}
+              </div>
+
+              <button className="kanban-add-btn" onClick={onNew}>
+                + Adicionar Tarefa
+              </button>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

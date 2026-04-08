@@ -18,14 +18,17 @@ function getWeekRange() {
 }
 
 export default function Tarefas({ onNew, onEdit }) {
-  const { tasks, toggleTask, deleteTask, searchQuery } = useApp()
+  const { tasks, toggleTask, deleteTask, searchQuery, clients } = useApp()
   const [activeTab, setActiveTab] = useState('Todas')
   const [tagFilter, setTagFilter] = useState('')
+  const [clientFilter, setClientFilter] = useState('')
 
   const today = new Date().toISOString().slice(0, 10)
   const { start: weekStart, end: weekEnd } = getWeekRange()
 
   const tags = [...new Set(tasks.map(t => t.tag).filter(Boolean))]
+  const overdueCount = tasks.filter(t => t.date < today && !t.done).length
+  const totalTaskCount = tasks.length
 
   const filtered = tasks.filter(task => {
     // search filter
@@ -53,43 +56,62 @@ export default function Tarefas({ onNew, onEdit }) {
               onClick={() => setActiveTab(tab)}
             >
               {tab}
-              {tab === 'Atrasadas' && tasks.filter(t => t.date < today && !t.done).length > 0 && (
+              {tab === 'Atrasadas' && overdueCount > 0 && (
                 <span style={{
                   marginLeft: '4px', background: 'var(--red)', color: 'white',
                   fontSize: '9px', padding: '0 4px', borderRadius: '10px',
                 }}>
-                  {tasks.filter(t => t.date < today && !t.done).length}
+                  {overdueCount}
+                </span>
+              )}
+              {tab === 'Quadro' && (
+                <span style={{
+                  marginLeft: '4px', background: 'var(--accent3-light)', color: 'var(--accent3)',
+                  fontSize: '9px', padding: '0 4px', borderRadius: '10px',
+                }}>
+                  {totalTaskCount}
                 </span>
               )}
             </div>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          <button
-            className={`task-tag${tagFilter === '' ? ' tag-green' : ''}`}
-            style={{ cursor: 'pointer', padding: '4px 10px', border: tagFilter === '' ? '1px solid currentColor' : '1px solid var(--border)' }}
-            onClick={() => setTagFilter('')}
-          >
-            Todas
-          </button>
-          {tags.map(tag => (
+
+        {activeTab !== 'Quadro' && (
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             <button
-              key={tag}
-              className={`task-tag tag-${tagFilter === tag ? tasks.find(t => t.tag === tag)?.tagColor || 'green' : ''}`}
-              style={{ cursor: 'pointer', padding: '4px 10px', border: tagFilter === tag ? '1px solid currentColor' : '1px solid var(--border)', background: tagFilter === tag ? undefined : 'transparent', color: tagFilter === tag ? undefined : 'var(--text2)' }}
-              onClick={() => setTagFilter(t => t === tag ? '' : tag)}
+              className={`task-tag${tagFilter === '' ? ' tag-green' : ''}`}
+              style={{ cursor: 'pointer', padding: '4px 10px', border: tagFilter === '' ? '1px solid currentColor' : '1px solid var(--border)' }}
+              onClick={() => setTagFilter('')}
             >
-              {tag}
+              Todas
             </button>
-          ))}
-        </div>
+            {tags.map(tag => (
+              <button
+                key={tag}
+                className={`task-tag tag-${tagFilter === tag ? tasks.find(t => t.tag === tag)?.tagColor || 'green' : ''}`}
+                style={{ cursor: 'pointer', padding: '4px 10px', border: tagFilter === tag ? '1px solid currentColor' : '1px solid var(--border)', background: tagFilter === tag ? undefined : 'transparent', color: tagFilter === tag ? undefined : 'var(--text2)' }}
+                onClick={() => setTagFilter(t => t === tag ? '' : tag)}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
           <button className="btn btn-primary" onClick={onNew}>+ Tarefa</button>
         </div>
       </div>
 
       {activeTab === 'Quadro' ? (
-        <KanbanBoard tasks={filtered} onNew={onNew} onEdit={onEdit} />
+        <KanbanBoard
+          tasks={filtered}
+          onNew={onNew}
+          onEdit={onEdit}
+          clientFilter={clientFilter}
+          onClientFilterChange={setClientFilter}
+          clients={clients}
+        />
       ) : (
         <div className="card">
           {filtered.length === 0 ? (
