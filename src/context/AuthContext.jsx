@@ -22,13 +22,20 @@ export function AuthProvider({ children }) {
   const [authLoading] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      if (error) {
+        // Token inválido/expirado no localStorage — limpa a sessão corrompida
+        try { await supabase.auth.signOut() } catch {}
+        return
+      }
       if (session?.user) {
         const profile = await fetchProfile(session.user.id)
         setCurrentUser(profile)
         fetchAllProfiles()
       }
-    }).catch(() => {})
+    }).catch(async () => {
+      try { await supabase.auth.signOut() } catch {}
+    })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
