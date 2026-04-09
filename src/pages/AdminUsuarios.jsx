@@ -16,7 +16,7 @@ export default function AdminUsuarios() {
   const navigate = useNavigate()
 
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', role: 'editor', password: '' })
+  const [form, setForm] = useState({ name: '', username: '', role: 'editor', password: '' })
   const [showPwd, setShowPwd] = useState(false)
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -34,19 +34,19 @@ export default function AdminUsuarios() {
 
   async function handleAdd(e) {
     e.preventDefault()
-    if (!form.name.trim()) return setFormError('Nome obrigatório')
-    if (!form.email.trim()) return setFormError('E-mail obrigatório')
-    if (users.find(u => u.email === form.email)) return setFormError('E-mail já cadastrado')
+    if (!form.name.trim())     return setFormError('Nome obrigatório')
+    if (!form.username.trim()) return setFormError('Nome de usuário obrigatório')
+    if (users.find(u => u.email === form.username)) return setFormError('Usuário já cadastrado')
     const pwd = form.password.trim() || genPassword()
     if (pwd.length < 6) return setFormError('Senha deve ter mínimo 6 caracteres')
 
     setSaving(true)
     setFormError('')
-    const { ok, error } = await createInvitedUser(form.email, pwd, form.name, form.role)
+    const { ok, error } = await createInvitedUser(form.username, pwd, form.name, form.role)
     if (!ok) { setFormError(error || 'Erro ao criar usuário'); setSaving(false); return }
 
-    setCreatedUser({ name: form.name, email: form.email, password: pwd, role: form.role })
-    setForm({ name: '', email: '', role: 'editor', password: '' })
+    setCreatedUser({ name: form.name, username: form.username, password: pwd, role: form.role })
+    setForm({ name: '', username: '', role: 'editor', password: '' })
     setShowForm(false)
     setSaving(false)
   }
@@ -71,10 +71,10 @@ export default function AdminUsuarios() {
       {createdUser && (
         <div className="card" style={{ marginBottom: '20px', padding: '20px', borderLeft: '3px solid var(--accent)' }}>
           <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '12px', color: 'var(--accent)' }}>
-            ✅ Usuário criado — compartilhe as credenciais com {createdUser.name}
+            ✅ Usuário criado — compartilhe com {createdUser.name}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
-            <div><span style={{ color: 'var(--text3)', width: '80px', display: 'inline-block' }}>E-mail</span><strong>{createdUser.email}</strong></div>
+            <div><span style={{ color: 'var(--text3)', width: '80px', display: 'inline-block' }}>Usuário</span><strong>{createdUser.username}</strong></div>
             <div><span style={{ color: 'var(--text3)', width: '80px', display: 'inline-block' }}>Senha</span>
               <code style={{ background: 'var(--surface2)', padding: '2px 8px', borderRadius: '4px', fontSize: '13px', fontFamily: 'DM Mono, monospace' }}>
                 {createdUser.password}
@@ -104,8 +104,8 @@ export default function AdminUsuarios() {
                 <input placeholder="Ex: João Silva" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
               </div>
               <div className="form-group">
-                <label>E-MAIL</label>
-                <input type="email" placeholder="joao@empresa.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required />
+                <label>USUÁRIO</label>
+                <input placeholder="Ex: joao (sem espaços)" value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value.toLowerCase().replace(/\s+/g, '') }))} required autoCapitalize="none" />
               </div>
             </div>
             <div className="form-row">
@@ -174,7 +174,7 @@ export default function AdminUsuarios() {
                   <span style={{ fontSize: '10px', background: 'var(--accent-light)', color: 'var(--accent)', padding: '1px 7px', borderRadius: '10px', fontWeight: 600 }}>Você</span>
                 )}
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{user.email}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text3)' }}>@{user.email || user.name?.toLowerCase()}</div>
             </div>
 
             {/* Seletor de papel */}

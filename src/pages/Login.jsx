@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
-  const { login, signup } = useAuth()
-  const [tab, setTab] = useState('login') // 'login' | 'signup'
-  const [form, setForm] = useState({ name: '', email: '', password: '' })
+  const { login, setupFirstAdmin } = useAuth()
+  const [tab, setTab] = useState('login') // 'login' | 'setup'
+  const [form, setForm] = useState({ name: '', username: '', password: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -16,16 +16,19 @@ export default function Login() {
     setLoading(true)
     try {
       if (tab === 'login') {
-        const { ok, error: err } = await login(form.email, form.password)
+        if (!form.username.trim()) { setError('Digite seu usuário'); return }
+        const { ok, error: err } = await login(form.username, form.password)
         if (!ok) setError(err || 'Erro ao entrar')
       } else {
-        if (!form.name.trim()) { setError('Nome obrigatório'); return }
-        const { ok, error: err } = await signup(form.email, form.password, form.name)
+        if (!form.name.trim())     { setError('Nome obrigatório'); return }
+        if (!form.username.trim()) { setError('Nome de usuário obrigatório'); return }
+        if (form.password.length < 6) { setError('Senha: mínimo 6 caracteres'); return }
+        const { ok, error: err } = await setupFirstAdmin(form.username, form.password, form.name)
         if (!ok) setError(err || 'Erro ao criar conta')
-        else setError('Conta criada! Faça login agora.')
+        else setError('Admin criado! Faça login agora.')
       }
-    } catch (e) {
-      setError('Erro de conexão. Verifique sua internet e tente novamente.')
+    } catch {
+      setError('Erro de conexão. Tente novamente.')
     } finally {
       setLoading(false)
     }
@@ -45,38 +48,42 @@ export default function Login() {
         </div>
 
         <div className="tabs" style={{ marginBottom: '20px' }}>
-          <div className={`tab${tab === 'login' ? ' active' : ''}`} onClick={() => { setTab('login'); setError('') }}>Entrar</div>
-          <div className={`tab${tab === 'signup' ? ' active' : ''}`} onClick={() => { setTab('signup'); setError('') }}>Criar conta</div>
+          <div className={`tab${tab === 'login' ? ' active' : ''}`} onClick={() => { setTab('login'); setError('') }}>
+            Entrar
+          </div>
+          <div className={`tab${tab === 'setup' ? ' active' : ''}`} onClick={() => { setTab('setup'); setError('') }}>
+            Criar Admin
+          </div>
         </div>
 
         <form onSubmit={handleSubmit}>
-          {tab === 'signup' && (
+          {tab === 'setup' && (
             <div className="form-group">
-              <label htmlFor="login-name">NOME</label>
+              <label htmlFor="login-name">NOME COMPLETO</label>
               <input
                 id="login-name"
                 name="name"
-                placeholder="Seu nome completo"
+                placeholder="Ex: Mateus Lucas"
                 value={form.name}
                 onChange={set('name')}
-                required
                 autoComplete="name"
               />
             </div>
           )}
+
           <div className="form-group">
-            <label htmlFor="login-email">E-MAIL</label>
+            <label htmlFor="login-username">USUÁRIO</label>
             <input
-              id="login-email"
-              name="email"
-              type="email"
-              placeholder="seu@email.com"
-              value={form.email}
-              onChange={set('email')}
-              required
-              autoComplete="email"
+              id="login-username"
+              name="username"
+              placeholder={tab === 'login' ? 'Seu nome de usuário' : 'Ex: mateus (sem espaços)'}
+              value={form.username}
+              onChange={set('username')}
+              autoComplete="username"
+              autoCapitalize="none"
             />
           </div>
+
           <div className="form-group">
             <label htmlFor="login-password">SENHA</label>
             <input
@@ -86,7 +93,6 @@ export default function Login() {
               placeholder="••••••••"
               value={form.password}
               onChange={set('password')}
-              required
               minLength={6}
               autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
             />
@@ -94,12 +100,9 @@ export default function Login() {
 
           {error && (
             <div style={{
-              fontSize: '12px',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              marginBottom: '12px',
-              background: error.startsWith('Conta criada') ? 'var(--accent-light)' : 'var(--red-light, #fee2e2)',
-              color: error.startsWith('Conta criada') ? 'var(--accent)' : 'var(--red)',
+              fontSize: '12px', padding: '8px 12px', borderRadius: '6px', marginBottom: '12px',
+              background: error.startsWith('Admin criado') ? 'var(--accent-light)' : 'var(--red-light, #fee2e2)',
+              color: error.startsWith('Admin criado') ? 'var(--accent)' : 'var(--red)',
             }}>
               {error}
             </div>
@@ -111,7 +114,7 @@ export default function Login() {
             style={{ width: '100%', padding: '10px', fontSize: '14px' }}
             disabled={loading}
           >
-            {loading ? '...' : tab === 'login' ? 'Entrar' : 'Criar conta'}
+            {loading ? '...' : tab === 'login' ? 'Entrar' : 'Criar Admin'}
           </button>
         </form>
       </div>
