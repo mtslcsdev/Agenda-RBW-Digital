@@ -6,12 +6,73 @@ import { usePermission } from '../hooks/usePermission'
 import NotificationBell from './NotificationBell'
 import { ActiveTimerBar } from './ui/TimerButton'
 
+function ChangePasswordModal({ onClose }) {
+  const { currentUser } = useAuth()
+  const [form, setForm] = useState({ current: '', next: '', confirm: '' })
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+
+  function handleSave() {
+    setError('')
+    if (!form.current) return setError('Digite sua senha atual.')
+    if (form.next.length < 6) return setError('Nova senha deve ter mínimo 6 caracteres.')
+    if (form.next !== form.confirm) return setError('As senhas não coincidem.')
+
+    // Verifica senha atual
+    const users = JSON.parse(localStorage.getItem('rbw_users') || '[]')
+    const user = users.find(u => u.id === currentUser?.id)
+    if (!user || user.password !== form.current) return setError('Senha atual incorreta.')
+
+    // Atualiza
+    const updated = users.map(u => u.id === currentUser.id ? { ...u, password: form.next } : u)
+    localStorage.setItem('rbw_users', JSON.stringify(updated))
+    setSuccess(true)
+  }
+
+  return (
+    <div className="modal-overlay open" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ width: '360px' }}>
+        <h3 style={{ marginBottom: '20px' }}>🔑 Alterar Senha</h3>
+        {success ? (
+          <>
+            <div style={{ fontSize: '13px', color: 'var(--accent)', background: 'var(--accent-light)', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
+              Senha alterada com sucesso!
+            </div>
+            <button className="btn btn-primary" style={{ width: '100%' }} onClick={onClose}>Fechar</button>
+          </>
+        ) : (
+          <>
+            <div className="form-group">
+              <label>SENHA ATUAL</label>
+              <input type="password" placeholder="••••••••" value={form.current} onChange={e => setForm(f => ({ ...f, current: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>NOVA SENHA</label>
+              <input type="password" placeholder="Mínimo 6 caracteres" value={form.next} onChange={e => setForm(f => ({ ...f, next: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>CONFIRMAR NOVA SENHA</label>
+              <input type="password" placeholder="Repita a nova senha" value={form.confirm} onChange={e => setForm(f => ({ ...f, confirm: e.target.value }))} />
+            </div>
+            {error && <div style={{ fontSize: '12px', color: 'var(--red)', marginBottom: '12px' }}>{error}</div>}
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+              <button className="btn btn-primary" onClick={handleSave}>Salvar</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function Topbar({ title, onNew, newLabel = '+ Novo', onMenuToggle }) {
   const { searchQuery, setSearchQuery } = useApp()
   const { currentUser, effectiveUser, viewingAs, stopViewingAs, logout } = useAuth()
   const { isViewingAs } = usePermission()
   const navigate = useNavigate()
   const [userOpen, setUserOpen] = useState(false)
+  const [pwdOpen, setPwdOpen] = useState(false)
   const dropRef = useRef()
 
   useEffect(() => {
@@ -28,7 +89,6 @@ export default function Topbar({ title, onNew, newLabel = '+ Novo', onMenuToggle
   return (
     <div className="topbar-wrapper">
     <ActiveTimerBar />
-    {/* Banner de "visualizando como" */}
     {isViewingAs && viewingAs && (
       <div style={{
         background: '#1a1a2e', color: '#e0e0ff', padding: '8px 20px',
@@ -45,14 +105,11 @@ export default function Topbar({ title, onNew, newLabel = '+ Novo', onMenuToggle
             {ROLES[viewingAs.role]?.label}
           </span>
         </span>
-        <button
-          onClick={handleStopViewingAs}
-          style={{
-            background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)',
-            color: 'white', borderRadius: '6px', padding: '3px 12px',
-            fontSize: '11px', cursor: 'pointer', fontWeight: 600,
-          }}
-        >
+        <button onClick={handleStopViewingAs} style={{
+          background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)',
+          color: 'white', borderRadius: '6px', padding: '3px 12px',
+          fontSize: '11px', cursor: 'pointer', fontWeight: 600,
+        }}>
           ← Voltar ao Admin
         </button>
       </div>
@@ -69,20 +126,13 @@ export default function Topbar({ title, onNew, newLabel = '+ Novo', onMenuToggle
             onChange={e => setSearchQuery(e.target.value)}
           />
           {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: '14px', padding: 0 }}
-            >
-              ✕
-            </button>
+            <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: '14px', padding: 0 }}>✕</button>
           )}
         </div>
 
         <NotificationBell />
 
-        {onNew && (
-          <button className="btn btn-primary" onClick={onNew}>{newLabel}</button>
-        )}
+        {onNew && <button className="btn btn-primary" onClick={onNew}>{newLabel}</button>}
 
         {effectiveUser && (
           <div className="user-menu" ref={dropRef}>
@@ -104,13 +154,18 @@ export default function Topbar({ title, onNew, newLabel = '+ Novo', onMenuToggle
                     <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{effectiveUser.email}</div>
                     <span style={{
                       fontSize: '10px', padding: '1px 7px', borderRadius: '10px', fontWeight: 600,
-                      color: ROLES[effectiveUser.role]?.color,
-                      background: ROLES[effectiveUser.role]?.bg,
+                      color: ROLES[effectiveUser.role]?.color, background: ROLES[effectiveUser.role]?.bg,
                     }}>
                       {ROLES[effectiveUser.role]?.label}
                     </span>
                   </div>
                 </div>
+                <div className="user-dropdown-divider" />
+                {!isViewingAs && (
+                  <button className="user-dropdown-item" onClick={() => { setUserOpen(false); setPwdOpen(true) }}>
+                    🔑 Alterar Senha
+                  </button>
+                )}
                 <div className="user-dropdown-divider" />
                 {!isViewingAs && (
                   <button className="user-dropdown-item danger" onClick={() => { setUserOpen(false); logout() }}>
@@ -128,6 +183,8 @@ export default function Topbar({ title, onNew, newLabel = '+ Novo', onMenuToggle
         )}
       </div>
     </div>
+
+    {pwdOpen && <ChangePasswordModal onClose={() => setPwdOpen(false)} />}
     </div>
   )
 }
