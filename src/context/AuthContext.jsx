@@ -15,8 +15,11 @@ export function AuthProvider({ children }) {
   const [authLoading, setAuthLoading] = useState(true)
 
   useEffect(() => {
-    // Listener de estado de autenticação
+    // Timeout: se Supabase demorar mais de 6s, libera a tela de login
+    const timeout = setTimeout(() => setAuthLoading(false), 6000)
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      clearTimeout(timeout)
       if (session?.user) {
         const profile = await fetchProfile(session.user.id)
         setCurrentUser(profile)
@@ -27,7 +30,7 @@ export function AuthProvider({ children }) {
       }
       setAuthLoading(false)
     })
-    return () => subscription.unsubscribe()
+    return () => { clearTimeout(timeout); subscription.unsubscribe() }
   }, [])
 
   async function fetchProfile(userId) {

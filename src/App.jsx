@@ -36,11 +36,19 @@ function LoadingScreen() {
   return (
     <div style={{
       height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      flexDirection: 'column', gap: '16px', color: 'var(--text3)',
-      background: 'var(--surface)',
+      flexDirection: 'column', gap: '20px', color: 'var(--text3)',
+      background: 'var(--bg)',
     }}>
-      <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--accent)', letterSpacing: '-1px' }}>RBW</div>
-      <div style={{ fontSize: '12px' }}>Carregando...</div>
+      <img
+        src={`${import.meta.env.BASE_URL}rbw-logo.svg`}
+        alt="RBW Digital"
+        style={{ width: '72px', height: '72px', borderRadius: '16px' }}
+      />
+      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--accent)', animation: 'pulse 1.2s ease-in-out infinite' }} />
+        <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--accent)', animation: 'pulse 1.2s ease-in-out 0.2s infinite' }} />
+        <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--accent)', animation: 'pulse 1.2s ease-in-out 0.4s infinite' }} />
+      </div>
     </div>
   )
 }

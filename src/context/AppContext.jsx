@@ -113,17 +113,23 @@ export function AppProvider({ children }) {
 
   async function loadAll() {
     try {
-      const [tRes, cRes, nRes, cmRes, aRes, eRes] = await Promise.all([
+      // Fase 1 — dados críticos (desbloqueia a UI imediatamente)
+      const [tRes, cRes, nRes] = await Promise.all([
         supabase.from('tasks').select('*').order('created_at', { ascending: false }),
         supabase.from('clients').select('*').order('created_at', { ascending: false }),
         supabase.from('notes').select('*').order('pinned', { ascending: false }).order('created_at', { ascending: false }),
+      ])
+      if (tRes.data) setTasksState(tRes.data.map(mapTask))
+      if (cRes.data) setClientsState(cRes.data.map(mapClient))
+      if (nRes.data) setNotesState(nRes.data.map(mapNote))
+      setAppLoading(false) // mostra o app sem esperar dados secundários
+
+      // Fase 2 — dados secundários (background)
+      const [cmRes, aRes, eRes] = await Promise.all([
         supabase.from('comments').select('*').order('created_at', { ascending: true }),
         supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(50),
         supabase.from('time_entries').select('*'),
       ])
-      if (tRes.data)  setTasksState(tRes.data.map(mapTask))
-      if (cRes.data)  setClientsState(cRes.data.map(mapClient))
-      if (nRes.data)  setNotesState(nRes.data.map(mapNote))
       if (cmRes.data) {
         const grouped = {}
         cmRes.data.forEach(c => {
@@ -132,8 +138,8 @@ export function AppProvider({ children }) {
         })
         setCommentsState(grouped)
       }
-      if (aRes.data)  setActivityLog(aRes.data.map(mapActivity))
-      if (eRes.data)  setTimeEntries(eRes.data.map(mapTimeEntry))
+      if (aRes.data) setActivityLog(aRes.data.map(mapActivity))
+      if (eRes.data) setTimeEntries(eRes.data.map(mapTimeEntry))
 
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
@@ -144,7 +150,6 @@ export function AppProvider({ children }) {
       }
     } catch (err) {
       console.error('Erro ao carregar dados do Supabase:', err)
-    } finally {
       setAppLoading(false)
     }
   }
