@@ -12,57 +12,45 @@ export const ROLES = {
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null)
   const [users, setUsers] = useState([])
-  // Começa carregando apenas se há sessão salva localmente (evita loading desnecessário)
-  const [authLoading, setAuthLoading] = useState(() => {
-    try {
-      // Checa qualquer chave do Supabase em localStorage
-      return Object.keys(localStorage).some(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
-    } catch { return false }
-  })
+  // Sem loading screen — login aparece imediatamente
+  const [authLoading] = useState(false)
 
   useEffect(() => {
-    let cancelled = false
-    const timeout = setTimeout(() => { if (!cancelled) setAuthLoading(false) }, 5000)
-
-    // getSession() lê do localStorage — instantâneo, sem chamada de rede
+    // Verifica sessão em background (sem travar a UI)
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      clearTimeout(timeout)
-      if (cancelled) return
       if (session?.user) {
         const profile = await fetchProfile(session.user.id)
-        if (!cancelled) {
-          setCurrentUser(profile)
-          fetchAllProfiles()
-        }
+        setCurrentUser(profile)
+        fetchAllProfiles()
       }
-      if (!cancelled) setAuthLoading(false)
-    })
+    }).catch(() => {}) // ignora erros de rede silenciosamente
 
-    // Listener para login/logout futuros
+    // Listener para login/logout
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (cancelled) return
       if (event === 'SIGNED_IN' && session?.user) {
         const profile = await fetchProfile(session.user.id)
-        if (!cancelled) { setCurrentUser(profile); fetchAllProfiles() }
+        setCurrentUser(profile)
+        fetchAllProfiles()
       } else if (event === 'SIGNED_OUT') {
-        if (!cancelled) { setCurrentUser(null); setUsers([]) }
-      } else if (event === 'USER_UPDATED' && session?.user) {
-        const profile = await fetchProfile(session.user.id)
-        if (!cancelled) setCurrentUser(profile)
+        setCurrentUser(null)
+        setUsers([])
       }
     })
-
-    return () => { cancelled = true; clearTimeout(timeout); subscription.unsubscribe() }
+    return () => subscription.unsubscribe()
   }, [])
 
   async function fetchProfile(userId) {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
-    return data
+    try {
+      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
+      return data
+    } catch { return null }
   }
 
   async function fetchAllProfiles() {
-    const { data } = await supabase.from('profiles').select('*').order('created_at')
-    if (data) setUsers(data)
+    try {
+      const { data } = await supabase.from('profiles').select('*').order('created_at')
+      if (data) setUsers(data)
+    } catch {}
   }
 
   async function login(email, password) {
