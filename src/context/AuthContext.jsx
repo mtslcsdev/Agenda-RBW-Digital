@@ -12,25 +12,47 @@ export const ROLES = {
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null)
   const [users, setUsers] = useState([])
-  const [authLoading, setAuthLoading] = useState(true)
+  // Começa carregando apenas se há sessão salva localmente (evita loading desnecessário)
+  const [authLoading, setAuthLoading] = useState(() => {
+    try {
+      // Checa qualquer chave do Supabase em localStorage
+      return Object.keys(localStorage).some(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
+    } catch { return false }
+  })
 
   useEffect(() => {
-    // Timeout: se Supabase demorar mais de 6s, libera a tela de login
-    const timeout = setTimeout(() => setAuthLoading(false), 6000)
+    let cancelled = false
+    const timeout = setTimeout(() => { if (!cancelled) setAuthLoading(false) }, 5000)
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // getSession() lê do localStorage — instantâneo, sem chamada de rede
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       clearTimeout(timeout)
+      if (cancelled) return
       if (session?.user) {
         const profile = await fetchProfile(session.user.id)
-        setCurrentUser(profile)
-        fetchAllProfiles()
-      } else {
-        setCurrentUser(null)
-        setUsers([])
+        if (!cancelled) {
+          setCurrentUser(profile)
+          fetchAllProfiles()
+        }
       }
-      setAuthLoading(false)
+      if (!cancelled) setAuthLoading(false)
     })
-    return () => { clearTimeout(timeout); subscription.unsubscribe() }
+
+    // Listener para login/logout futuros
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (cancelled) return
+      if (event === 'SIGNED_IN' && session?.user) {
+        const profile = await fetchProfile(session.user.id)
+        if (!cancelled) { setCurrentUser(profile); fetchAllProfiles() }
+      } else if (event === 'SIGNED_OUT') {
+        if (!cancelled) { setCurrentUser(null); setUsers([]) }
+      } else if (event === 'USER_UPDATED' && session?.user) {
+        const profile = await fetchProfile(session.user.id)
+        if (!cancelled) setCurrentUser(profile)
+      }
+    })
+
+    return () => { cancelled = true; clearTimeout(timeout); subscription.unsubscribe() }
   }, [])
 
   async function fetchProfile(userId) {
@@ -50,18 +72,12 @@ export function AuthProvider({ children }) {
   }
 
   async function signup(email, password, name) {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name } },
-    })
+    const { error } = await supabase.auth.signUp({ email, password, options: { data: { name } } })
     if (error) return { ok: false, error: error.message }
     return { ok: true }
   }
 
-  async function logout() {
-    await supabase.auth.signOut()
-  }
+  async function logout() { await supabase.auth.signOut() }
 
   async function updateUserRole(userId, role) {
     const { error } = await supabase.from('profiles').update({ role }).eq('id', userId)
@@ -78,21 +94,12 @@ export function AuthProvider({ children }) {
   }
 
   async function createInvitedUser(email, password, name, role) {
-    // Cria usuário — trigger auto-cria o profile com role='viewer'
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name } },
-    })
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { name } } })
     if (error) return { ok: false, error: error.message }
-
-    // Atualiza role se não for viewer
     if (role !== 'viewer' && data?.user) {
-      // Aguarda trigger criar o profile
       await new Promise(r => setTimeout(r, 800))
       await supabase.from('profiles').update({ role, name, initials: name.slice(0, 2).toUpperCase() }).eq('id', data.user.id)
     }
-
     await fetchAllProfiles()
     return { ok: true }
   }
@@ -101,8 +108,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       currentUser, users, authLoading,
       login, signup, logout,
-      updateUserRole, removeUser, createInvitedUser,
-      fetchAllProfiles,
+      updateUserRole, removeUser, createInvitedUser, fetchAllProfiles,
     }}>
       {children}
     </AuthContext.Provider>

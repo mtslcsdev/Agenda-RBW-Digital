@@ -42,7 +42,7 @@ function LoadingScreen() {
       <img
         src={`${import.meta.env.BASE_URL}rbw-logo.svg`}
         alt="RBW Digital"
-        style={{ width: '72px', height: '72px', borderRadius: '16px' }}
+        style={{ width: '120px', height: '120px', borderRadius: '24px' }}
       />
       <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
         <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--accent)', animation: 'pulse 1.2s ease-in-out infinite' }} />
