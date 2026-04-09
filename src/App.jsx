@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { AppProvider, useApp } from './context/AppContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import Login from './pages/Login'
 import { usePermission } from './hooks/usePermission'
 import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
@@ -126,13 +127,19 @@ function AppLayout() {
   )
 }
 
+function AuthGuard({ children }) {
+  const { currentUser } = useAuth()
+  if (!currentUser) return <Login />
+  return <AppProvider>{children}</AppProvider>
+}
+
 export default function App() {
   return (
     <BrowserRouter basename="/Agenda-RBW-Digital">
       <AuthProvider>
-        <AppProvider>
+        <AuthGuard>
           <AppLayout />
-        </AppProvider>
+        </AuthGuard>
       </AuthProvider>
     </BrowserRouter>
   )
