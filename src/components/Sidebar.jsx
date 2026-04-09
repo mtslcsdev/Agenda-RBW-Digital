@@ -1,17 +1,19 @@
 import { NavLink } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
+import { useAuth, ROLES } from '../context/AuthContext'
+import { usePermission } from '../hooks/usePermission'
 import { clientSlug } from '../pages/ClientDetail'
 import rbwLogo from '../assets/rbw-logo.svg'
 
 export default function Sidebar({ open, onClose }) {
   const { theme, toggleTheme, clients, tasks } = useApp()
+  const { currentUser } = useAuth()
+  const { isAdmin } = usePermission()
   const today = new Date().toISOString().slice(0, 10)
   const overdueCount = tasks.filter(t => t.date < today && !t.done).length
   const todayCount = tasks.filter(t => t.date === today && !t.done).length
 
-  const handleNav = () => {
-    if (onClose) onClose()
-  }
+  const handleNav = () => { if (onClose) onClose() }
 
   return (
     <>
@@ -71,6 +73,15 @@ export default function Sidebar({ open, onClose }) {
           </NavLink>
         </nav>
 
+        {isAdmin && (
+          <nav className="nav-section" style={{ marginTop: '8px' }}>
+            <div className="nav-label">Administração</div>
+            <NavLink to="/admin" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} onClick={handleNav}>
+              <span className="icon">⚙️</span> Usuários
+            </NavLink>
+          </nav>
+        )}
+
         <div className="sidebar-bottom">
           <div className="theme-toggle">
             <span>Tema</span>
@@ -78,13 +89,15 @@ export default function Sidebar({ open, onClose }) {
               {theme === 'dark' ? '☀️' : '🌙'}
             </button>
           </div>
-          <div className="user-card">
-            <div className="user-avatar">M</div>
-            <div className="user-info">
-              <p>Mateus</p>
-              <span>Ops. Assistant</span>
+          {currentUser && (
+            <div className="user-card">
+              <div className="user-avatar" style={{ background: currentUser.color }}>{currentUser.initials}</div>
+              <div className="user-info">
+                <p>{currentUser.name}</p>
+                <span style={{ color: ROLES[currentUser.role]?.color }}>{ROLES[currentUser.role]?.label}</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </aside>
     </>

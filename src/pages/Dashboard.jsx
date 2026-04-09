@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext'
 import StatCard from '../components/ui/StatCard'
 import TaskItem from '../components/ui/TaskItem'
 import NoteCard from '../components/ui/NoteCard'
+import ActivityFeed from '../components/ui/ActivityFeed'
 import { clientSlug } from './ClientDetail'
 
 const scheduleItems = [
@@ -162,6 +163,14 @@ export default function Dashboard({ onNewTask, onEditTask }) {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Atividade Recente */}
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">📜 Atividade Recente</span>
+        </div>
+        <ActivityFeed limit={8} />
       </div>
     </>
   )

@@ -70,6 +70,7 @@ export default function ClientDetail({ onNewTask, onEditTask, onEditClient }) {
           </p>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+          <button className="btn btn-ghost" onClick={() => navigate(`/relatorio/${id}`)}>📄 Relatório</button>
           <button className="btn btn-ghost" onClick={() => onEditClient(client)}>✏️ Editar</button>
           <button className="btn btn-ghost" style={{ color: 'var(--red)' }} onClick={handleArchive}>Arquivar</button>
           <button className="btn btn-primary" onClick={onNewTask}>+ Tarefa</button>

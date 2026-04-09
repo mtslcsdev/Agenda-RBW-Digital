@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useApp, TAG_OPTIONS, TAG_COLORS } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
+import { usePermission } from '../hooks/usePermission'
+import CommentSection from './ui/CommentSection'
 
 const PRIORITY_COLORS = { Normal: 'green', Alta: 'orange', Urgente: 'red' }
 
@@ -12,6 +15,8 @@ function toInputDate(iso) {
 
 export default function TaskModal({ open, onClose, editingTask = null }) {
   const { clients, addTask, editTask } = useApp()
+  const { currentUser } = useAuth()
+  const { canEdit } = usePermission()
   const overlayRef = useRef()
   const [selectedTag, setSelectedTag] = useState('N8N')
   const isEdit = !!editingTask
@@ -43,9 +48,9 @@ export default function TaskModal({ open, onClose, editingTask = null }) {
       done: taskStatus === 'concluido',
     }
     if (isEdit) {
-      editTask(editingTask.id, data)
+      editTask(editingTask.id, data, currentUser)
     } else {
-      addTask(data)
+      addTask(data, currentUser)
     }
     onClose()
     e.target.reset()
@@ -135,9 +140,11 @@ export default function TaskModal({ open, onClose, editingTask = null }) {
           </div>
           <div className="modal-actions">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="btn btn-primary">{isEdit ? 'Salvar' : 'Criar'}</button>
+            {canEdit && <button type="submit" className="btn btn-primary">{isEdit ? 'Salvar' : 'Criar'}</button>}
           </div>
         </form>
+
+        {isEdit && <CommentSection taskId={editingTask?.id} />}
       </div>
     </div>
   )

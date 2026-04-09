@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import { KANBAN_COLUMNS, PRIORITY_COLORS } from '../../context/AppContext'
+import { usePermission } from '../../hooks/usePermission'
 import TaskTag from './TaskTag'
 
 function getRelativeDate(iso) {
@@ -24,6 +25,7 @@ const COLUMN_ICONS = {
 
 function KanbanCard({ task, onEdit, onDragStart }) {
   const { moveTask, deleteTask } = useApp()
+  const { canEdit, canDelete } = usePermission()
   const [hovered, setHovered] = useState(false)
   const rel = getRelativeDate(task.date)
   const priorityColor = PRIORITY_COLORS[task.priority]
@@ -60,7 +62,7 @@ function KanbanCard({ task, onEdit, onDragStart }) {
           )}
         </div>
         <div className={`kanban-card-actions${hovered ? ' visible' : ''}`}>
-          {onEdit && (
+          {onEdit && canEdit && (
             <button
               className="btn-icon"
               style={{ width: '24px', height: '24px', fontSize: '11px' }}
@@ -70,14 +72,16 @@ function KanbanCard({ task, onEdit, onDragStart }) {
               ✏️
             </button>
           )}
-          <button
-            className="btn-icon"
-            style={{ width: '24px', height: '24px', fontSize: '11px', color: 'var(--red)' }}
-            onClick={e => { e.stopPropagation(); deleteTask(task.id) }}
-            title="Excluir"
-          >
-            ✕
-          </button>
+          {canDelete && (
+            <button
+              className="btn-icon"
+              style={{ width: '24px', height: '24px', fontSize: '11px', color: 'var(--red)' }}
+              onClick={e => { e.stopPropagation(); deleteTask(task.id) }}
+              title="Excluir"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
     </div>

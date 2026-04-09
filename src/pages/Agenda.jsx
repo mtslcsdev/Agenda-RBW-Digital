@@ -11,7 +11,8 @@ const RECURRENCIAS = [
   { type: 'Mensal', typeColor: 'purple', title: 'Relatório de performance dos clientes' },
 ]
 
-const TABS = ['Semana', 'Lista']
+const TABS = ['Semana', 'Lista', 'Mês']
+const MONTH_DAY_ABBRS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
 function getMondayOf(date) {
   const d = new Date(date)
@@ -46,7 +47,9 @@ function formatMonthRange(monday) {
 export default function Agenda() {
   const { tasks, toggleTask } = useApp()
   const [activeTab, setActiveTab] = useState('Semana')
-  const [weekOffset, setWeekOffset] = useState(0) // 0 = current week
+  const [weekOffset, setWeekOffset] = useState(0)
+  const [monthOffset, setMonthOffset] = useState(0)
+  const [selectedDay, setSelectedDay] = useState(null)
 
   const today = toISO(new Date())
   const baseMonday = getMondayOf(new Date())
@@ -152,6 +155,88 @@ export default function Agenda() {
           )}
         </div>
       )}
+
+      {activeTab === 'Mês' && (() => {
+        const now = new Date()
+        const year = now.getFullYear()
+        const month = now.getMonth() + monthOffset
+        const firstDay = new Date(year, month, 1)
+        const lastDay = new Date(year, month + 1, 0)
+        const startPad = firstDay.getDay() // 0=Sun
+        const monthName = firstDay.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+
+        const cells = []
+        for (let i = 0; i < startPad; i++) cells.push(null)
+        for (let d = 1; d <= lastDay.getDate(); d++) cells.push(d)
+        while (cells.length % 7 !== 0) cells.push(null)
+
+        const todayStr = toISO(new Date())
+        const getISO = (d) => {
+          const dt = new Date(year, month, d)
+          return toISO(dt)
+        }
+
+        const selectedTasks = selectedDay ? tasks.filter(t => t.date === getISO(selectedDay)) : []
+
+        return (
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <button className="btn btn-ghost" style={{ padding: '5px 10px' }} onClick={() => { setMonthOffset(o => o - 1); setSelectedDay(null) }}>←</button>
+              <span style={{ fontSize: '13px', fontWeight: 600, flex: 1, textAlign: 'center', textTransform: 'capitalize' }}>{monthName}</span>
+              <button className="btn btn-ghost" style={{ padding: '5px 10px' }} onClick={() => { setMonthOffset(o => o + 1); setSelectedDay(null) }}>→</button>
+              {monthOffset !== 0 && <button className="btn btn-ghost" style={{ fontSize: '11px', padding: '4px 8px' }} onClick={() => { setMonthOffset(0); setSelectedDay(null) }}>Hoje</button>}
+            </div>
+            <div className="calendar-grid">
+              {MONTH_DAY_ABBRS.map(d => (
+                <div key={d} className="calendar-day-header">{d}</div>
+              ))}
+              {cells.map((day, i) => {
+                if (!day) return <div key={`pad-${i}`} className="calendar-cell empty" />
+                const iso = getISO(day)
+                const dayTasks = tasks.filter(t => t.date === iso)
+                const isToday = iso === todayStr
+                const isSelected = selectedDay === day && monthOffset === 0 ? iso === getISO(selectedDay) : selectedDay === day
+                return (
+                  <div
+                    key={day}
+                    className={`calendar-cell${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}`}
+                    onClick={() => setSelectedDay(selectedDay === day ? null : day)}
+                  >
+                    <span className="calendar-day-num">{day}</span>
+                    <div className="calendar-dots">
+                      {dayTasks.slice(0, 3).map(t => (
+                        <span
+                          key={t.id}
+                          className={`calendar-dot${t.done ? ' done' : ''}`}
+                          style={{ background: t.tagColor === 'orange' ? 'var(--accent2)' : t.tagColor === 'purple' ? 'var(--accent3)' : t.tagColor === 'red' ? 'var(--red)' : t.tagColor === 'yellow' ? 'var(--yellow)' : 'var(--accent)' }}
+                          title={t.title}
+                        />
+                      ))}
+                      {dayTasks.length > 3 && <span style={{ fontSize: '9px', color: 'var(--text3)' }}>+{dayTasks.length - 3}</span>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            {selectedDay && (
+              <div className="card" style={{ marginTop: '12px' }}>
+                <div className="card-header">
+                  <span className="card-title">📋 Tarefas — dia {selectedDay}</span>
+                </div>
+                {selectedTasks.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '16px', color: 'var(--text3)', fontSize: '12px' }}>Nenhuma tarefa neste dia</div>
+                ) : selectedTasks.map(t => (
+                  <div key={t.id} className="task-item">
+                    <div className={`task-check${t.done ? ' done' : ''}`} onClick={() => toggleTask(t.id)}>{t.done ? '✓' : ''}</div>
+                    <span className={`task-text${t.done ? ' done' : ''}`}>{t.title}</span>
+                    {t.tag && <TaskTag label={t.tag} color={t.tagColor} />}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       <div className="card">
         <div className="card-header">

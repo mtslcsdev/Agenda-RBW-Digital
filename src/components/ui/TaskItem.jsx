@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import TaskTag from './TaskTag'
 import { PRIORITY_COLORS } from '../../context/AppContext'
+import { usePermission } from '../../hooks/usePermission'
+import { TimerButton } from './TimerButton'
 
 function getRelativeDate(iso) {
   if (!iso) return null
@@ -18,6 +20,7 @@ function getRelativeDate(iso) {
 
 export default function TaskItem({ task, onToggle, onEdit, onDelete, showDate }) {
   const [hovered, setHovered] = useState(false)
+  const { canEdit, canDelete } = usePermission()
   const rel = showDate ? getRelativeDate(task.date) : null
   const priorityColor = PRIORITY_COLORS[task.priority]
 
@@ -50,9 +53,12 @@ export default function TaskItem({ task, onToggle, onEdit, onDelete, showDate })
           {rel.label}{rel.overdue && !task.done ? ' ⚠️' : ''}
         </span>
       )}
-      {(onEdit || onDelete) && (
+      <div style={{ opacity: hovered ? 1 : 0, transition: 'opacity 0.15s' }}>
+        <TimerButton taskId={task.id} />
+      </div>
+      {(onEdit || onDelete) && (canEdit || canDelete) && (
         <div style={{ display: 'flex', gap: '4px', marginLeft: '4px' }}>
-          {onEdit && (
+          {onEdit && canEdit && (
             <button
               className="btn-icon"
               style={{ width: '22px', height: '22px', fontSize: '11px', opacity: hovered ? 1 : 0, transition: 'opacity 0.15s' }}
@@ -62,7 +68,7 @@ export default function TaskItem({ task, onToggle, onEdit, onDelete, showDate })
               ✏️
             </button>
           )}
-          {onDelete && (
+          {onDelete && canDelete && (
             <button
               className="btn-icon"
               style={{ width: '22px', height: '22px', fontSize: '11px', opacity: hovered ? 1 : 0, transition: 'opacity 0.15s', color: 'var(--red)' }}
