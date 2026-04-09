@@ -14,16 +14,21 @@ export default function Login() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    if (tab === 'login') {
-      const { ok, error: err } = await login(form.email, form.password)
-      if (!ok) setError(err || 'Erro ao entrar')
-    } else {
-      if (!form.name.trim()) { setError('Nome obrigatório'); setLoading(false); return }
-      const { ok, error: err } = await signup(form.email, form.password, form.name)
-      if (!ok) setError(err || 'Erro ao criar conta')
-      else setError('Conta criada! Verifique seu e-mail se necessário.')
+    try {
+      if (tab === 'login') {
+        const { ok, error: err } = await login(form.email, form.password)
+        if (!ok) setError(err || 'Erro ao entrar')
+      } else {
+        if (!form.name.trim()) { setError('Nome obrigatório'); return }
+        const { ok, error: err } = await signup(form.email, form.password, form.name)
+        if (!ok) setError(err || 'Erro ao criar conta')
+        else setError('Conta criada! Faça login agora.')
+      }
+    } catch (e) {
+      setError('Erro de conexão. Verifique sua internet e tente novamente.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (

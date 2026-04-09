@@ -54,9 +54,20 @@ export function AuthProvider({ children }) {
   }
 
   async function login(email, password) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) return { ok: false, error: error.message }
-    return { ok: true }
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        const msg = error.message.includes('Email not confirmed')
+          ? 'E-mail não confirmado. Verifique sua caixa de entrada ou contate o administrador.'
+          : error.message.includes('Invalid login credentials')
+          ? 'E-mail ou senha incorretos.'
+          : error.message
+        return { ok: false, error: msg }
+      }
+      return { ok: true }
+    } catch {
+      return { ok: false, error: 'Erro de conexão com o servidor.' }
+    }
   }
 
   async function signup(email, password, name) {
