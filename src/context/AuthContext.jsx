@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
-// Email interno gerado a partir do nome de usuário (nunca exposto ao usuário)
 const DOMAIN = '@rbw.app'
 export function usernameToEmail(username) {
   return username.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '') + DOMAIN
@@ -22,20 +21,13 @@ export function AuthProvider({ children }) {
   const [authLoading] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
-      if (error) {
-        // Token inválido/expirado no localStorage — limpa a sessão corrompida
-        try { await supabase.auth.signOut() } catch {}
-        return
-      }
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const profile = await fetchProfile(session.user.id)
         setCurrentUser(profile)
         fetchAllProfiles()
       }
-    }).catch(async () => {
-      try { await supabase.auth.signOut() } catch {}
-    })
+    }).catch(() => {})
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
@@ -64,82 +56,46 @@ export function AuthProvider({ children }) {
     } catch {}
   }
 
-  // Helper: fetch para auth com timeout e AbortController
-  // isTokenEndpoint=true → omite Authorization header (conflito com sb_publishable_ key)
-  async function authFetch(endpoint, body, isTokenEndpoint = false) {
-    const url = `${import.meta.env.VITE_SUPABASE_URL}/auth/v1/${endpoint}`
-    const key  = import.meta.env.VITE_SUPABASE_ANON_KEY
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 20000)
-    try {
-      const headers = {
-        'Content-Type': 'application/json',
-        'apikey': key,
-      }
-      if (!isTokenEndpoint) {
-        headers['Authorization'] = `Bearer ${key}`
-      }
-      const res = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      })
-      const data = await res.json().catch(() => ({}))
-      return { res, data }
-    } finally {
-      clearTimeout(timer)
-    }
-  }
-
-  // Login usando fetch direto com AbortController
   async function login(username, password) {
+    const email = usernameToEmail(username)
     try {
-      const email = usernameToEmail(username)
-      // grant_type no body (não na URL), sem Authorization header
-      const { res, data } = await authFetch('token', { email, password, grant_type: 'password' }, true)
-      if (!res.ok) {
-        const msg = data.error_description || data.msg || data.message || `Erro ${res.status}`
-        return {
-          ok: false,
-          error: (msg.includes('Invalid login') || msg.includes('invalid_grant'))
-            ? 'Usuário ou senha incorretos.'
-            : msg || 'Erro ao entrar.',
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        const msg = error.message || ''
+        if (msg.toLowerCase().includes('invalid') || msg.includes('credentials')) {
+          return { ok: false, error: 'Usuário ou senha incorretos.' }
         }
+        if (msg.toLowerCase().includes('abort') || msg.toLowerCase().includes('fetch') || msg.toLowerCase().includes('network')) {
+          return { ok: false, error: 'Tempo esgotado (15s). Verifique sua conexão e tente novamente.' }
+        }
+        return { ok: false, error: msg || 'Erro ao entrar.' }
       }
-      await supabase.auth.setSession({
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-      })
       return { ok: true }
     } catch (e) {
+      const msg = e?.message || ''
       return {
         ok: false,
-        error: e.name === 'AbortError'
-          ? 'Servidor não respondeu em 20s. Tente novamente ou verifique sua internet.'
-          : 'Erro de conexão: ' + (e.message || ''),
+        error: msg.toLowerCase().includes('abort')
+          ? 'Tempo esgotado (15s). Verifique sua conexão e tente novamente.'
+          : 'Erro de conexão: ' + (msg || ''),
       }
     }
   }
 
-  // Criar o primeiro admin (auto-cadastro)
   async function setupFirstAdmin(username, password, name) {
+    const email = usernameToEmail(username)
     try {
-      const email = usernameToEmail(username)
-      const { res, data } = await authFetch('signup', {
-        email, password, data: { name },
+      const { error } = await supabase.auth.signUp({
+        email, password, options: { data: { name } },
       })
-      if (!res.ok) {
-        const msg = data.error_description || data.msg || data.message || ''
-        return { ok: false, error: msg || 'Erro ao criar conta.' }
-      }
+      if (error) return { ok: false, error: error.message || 'Erro ao criar conta.' }
       return { ok: true }
     } catch (e) {
       return {
         ok: false,
-        error: e.name === 'AbortError'
-          ? 'Servidor não respondeu. Tente novamente.'
-          : 'Erro: ' + (e.message || ''),
+        error: e?.message?.toLowerCase().includes('abort')
+          ? 'Tempo esgotado. Tente novamente.'
+          : 'Erro: ' + (e?.message || ''),
       }
     }
   }
@@ -167,21 +123,18 @@ export function AuthProvider({ children }) {
   }
 
   async function createInvitedUser(username, password, name, role) {
+    const email = usernameToEmail(username)
     try {
-      const email = usernameToEmail(username)
-      const { res, data } = await authFetch('signup', {
-        email, password, data: { name },
+      const { data, error } = await supabase.auth.signUp({
+        email, password, options: { data: { name } },
       })
-      if (!res.ok) {
-        const msg = data.error_description || data.msg || data.message || ''
-        return { ok: false, error: msg || 'Erro ao criar usuário.' }
-      }
+      if (error) return { ok: false, error: error.message || 'Erro ao criar usuário.' }
       if (data?.user?.id) {
         await new Promise(r => setTimeout(r, 800))
         await supabase.from('profiles').update({
           role, name,
           initials: name.slice(0, 2).toUpperCase(),
-          email: username, // guarda username no campo email para exibição
+          email: username,
         }).eq('id', data.user.id)
       }
       await fetchAllProfiles()
@@ -189,9 +142,9 @@ export function AuthProvider({ children }) {
     } catch (e) {
       return {
         ok: false,
-        error: e.name === 'AbortError'
-          ? 'Servidor não respondeu. Tente novamente.'
-          : 'Erro: ' + (e.message || ''),
+        error: e?.message?.toLowerCase().includes('abort')
+          ? 'Tempo esgotado. Tente novamente.'
+          : 'Erro: ' + (e?.message || ''),
       }
     }
   }
