@@ -1,49 +1,49 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-/* ===== DESIGN SYSTEM — FLOWDESK ===== */
+/* ===== DESIGN SYSTEM ===== */
 :root {
-  --bg: #F5F4F0;
-  --surface: #FFFFFF;
-  --surface2: #EFEFEB;
-  --border: #E0DED8;
-  --text: #1A1916;
-  --text2: #6B6960;
-  --text3: #9B998F;
+  --bg: #f0f2f6;
+  --surface: #ffffff;
+  --surface2: #f5f7fa;
+  --border: #e3e6ee;
+  --text: #1a1f30;
+  --text2: #52596c;
+  --text3: #8891a8;
   --accent: #2D6A4F;
-  --accent-light: #D8EDE4;
+  --accent-light: #d4ede3;
   --accent2: #E07A3A;
-  --accent2-light: #FDE8D8;
+  --accent2-light: #fde8d8;
   --accent3: #5B4FCF;
-  --accent3-light: #E8E5F9;
-  --red: #D94F3D;
-  --red-light: #FBEAE8;
-  --yellow: #E8A923;
-  --yellow-light: #FDF3DC;
-  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
-  --shadow-md: 0 4px 24px rgba(0,0,0,0.08);
-  --radius: 12px;
+  --accent3-light: #e8e5f9;
+  --red: #e5534b;
+  --red-light: #feeae8;
+  --yellow: #e8a923;
+  --yellow-light: #fdf3dc;
+  --shadow: 0 1px 3px rgba(26,31,46,0.05), 0 4px 16px rgba(26,31,46,0.05);
+  --shadow-md: 0 4px 24px rgba(26,31,46,0.10);
+  --radius: 10px;
   --radius-sm: 8px;
 }
 
 [data-theme="dark"] {
-  --bg: #141412;
-  --surface: #1E1D1A;
-  --surface2: #272521;
-  --border: #333128;
-  --text: #F0EEE8;
-  --text2: #9B998F;
-  --text3: #6B6960;
+  --bg: #0f1117;
+  --surface: #1a1c26;
+  --surface2: #22252f;
+  --border: #2d3045;
+  --text: #f0f2f8;
+  --text2: #9199b2;
+  --text3: #565e78;
   --accent: #52B788;
-  --accent-light: #1A3329;
+  --accent-light: #1a3329;
   --accent2: #F4945C;
-  --accent2-light: #3A2016;
-  --accent3: #8B80E8;
-  --accent3-light: #221E4A;
-  --red: #E8695A;
-  --red-light: #3A1A16;
+  --accent2-light: #3a2016;
+  --accent3: #8b80e8;
+  --accent3-light: #221e4a;
+  --red: #e8695a;
+  --red-light: #3a1a16;
   --yellow: #F2C05A;
-  --yellow-light: #3A2E0C;
-  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2);
+  --yellow-light: #3a2e0c;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.25);
   --shadow-md: 0 4px 24px rgba(0,0,0,0.4);
 }
 
@@ -59,10 +59,10 @@ html, body, #root {
 }
 
 body {
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Inter', sans-serif;
   background: var(--bg);
   color: var(--text);
-  font-size: 15px;
+  font-size: 14px;
   transition: background 0.3s, color 0.3s;
   -webkit-font-smoothing: antialiased;
 }
@@ -79,6 +79,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: var(--bg);
 }
 
 .content {
@@ -119,7 +120,6 @@ body {
   .app {
     overflow: visible;
   }
-
   .main {
     margin-left: 0 !important;
     width: 100%;
