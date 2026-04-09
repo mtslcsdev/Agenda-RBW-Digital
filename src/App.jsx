@@ -8,7 +8,6 @@ import Topbar from './components/Topbar'
 import TaskModal from './components/TaskModal'
 import ClientModal from './components/ClientModal'
 import NoteModal from './components/NoteModal'
-import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Agenda from './pages/Agenda'
 import Tarefas from './pages/Tarefas'
@@ -127,21 +126,13 @@ function AppLayout() {
   )
 }
 
-function AuthGuard({ children }) {
-  const { currentUser, authLoading } = useAuth()
-  if (authLoading) return <LoadingScreen />
-  if (!currentUser) return <Login />
-  // AppProvider monta APÓS autenticação para garantir sessão válida nas queries
-  return <AppProvider>{children}</AppProvider>
-}
-
 export default function App() {
   return (
     <BrowserRouter basename="/Agenda-RBW-Digital">
       <AuthProvider>
-        <AuthGuard>
+        <AppProvider>
           <AppLayout />
-        </AuthGuard>
+        </AppProvider>
       </AuthProvider>
     </BrowserRouter>
   )
