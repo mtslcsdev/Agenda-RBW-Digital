@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
-import { AppProvider } from './context/AppContext'
+import { AppProvider, useApp } from './context/AppContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
@@ -32,8 +32,22 @@ const NEW_LABELS = {
   '/notas': '+ Nota',
 }
 
+function LoadingScreen() {
+  return (
+    <div style={{
+      height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexDirection: 'column', gap: '16px', color: 'var(--text3)',
+      background: 'var(--surface)',
+    }}>
+      <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--accent)', letterSpacing: '-1px' }}>RBW</div>
+      <div style={{ fontSize: '12px' }}>Carregando...</div>
+    </div>
+  )
+}
+
 function AppLayout() {
   const { pathname } = useLocation()
+  const { appLoading } = useApp()
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [taskOpen, setTaskOpen] = useState(false)
@@ -41,6 +55,8 @@ function AppLayout() {
   const [clientOpen, setClientOpen] = useState(false)
   const [editingClient, setEditingClient] = useState(null)
   const [noteOpen, setNoteOpen] = useState(false)
+
+  if (appLoading) return <LoadingScreen />
 
   function openNewTask() { setEditingTask(null); setTaskOpen(true) }
   function openEditTask(task) { setEditingTask(task); setTaskOpen(true) }
@@ -88,36 +104,28 @@ function AppLayout() {
         </div>
       </div>
 
-      <TaskModal
-        open={taskOpen}
-        onClose={() => { setTaskOpen(false); setEditingTask(null) }}
-        editingTask={editingTask}
-      />
-      <ClientModal
-        open={clientOpen}
-        onClose={() => { setClientOpen(false); setEditingClient(null) }}
-        editingClient={editingClient}
-      />
+      <TaskModal open={taskOpen} onClose={() => { setTaskOpen(false); setEditingTask(null) }} editingTask={editingTask} />
+      <ClientModal open={clientOpen} onClose={() => { setClientOpen(false); setEditingClient(null) }} editingClient={editingClient} />
       <NoteModal open={noteOpen} onClose={() => setNoteOpen(false)} />
     </div>
   )
 }
 
 function AuthGuard({ children }) {
-  const { currentUser } = useAuth()
+  const { currentUser, authLoading } = useAuth()
+  if (authLoading) return <LoadingScreen />
   if (!currentUser) return <Login />
-  return children
+  // AppProvider monta APÓS autenticação para garantir sessão válida nas queries
+  return <AppProvider>{children}</AppProvider>
 }
 
 export default function App() {
   return (
     <BrowserRouter basename="/Agenda-RBW-Digital">
       <AuthProvider>
-        <AppProvider>
-          <AuthGuard>
-            <AppLayout />
-          </AuthGuard>
-        </AppProvider>
+        <AuthGuard>
+          <AppLayout />
+        </AuthGuard>
       </AuthProvider>
     </BrowserRouter>
   )

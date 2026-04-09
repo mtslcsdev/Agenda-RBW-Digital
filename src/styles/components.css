@@ -1248,6 +1248,35 @@
 .login-error { color: var(--red); font-size: 12px; }
 .login-footer { text-align: center; font-size: 11px; color: var(--text3); margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
 
+/* Login page (Supabase email+password) */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding: 20px;
+}
+.login-brand {
+  text-align: center;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.login-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px; height: 48px;
+  background: var(--accent);
+  border-radius: 12px;
+  font-size: 16px; font-weight: 800;
+  color: white; letter-spacing: -0.5px;
+  margin-bottom: 10px;
+}
+.login-brand-name { font-size: 17px; font-weight: 700; letter-spacing: 0.3px; }
+.login-brand-sub  { font-size: 12px; color: var(--text3); margin-top: 2px; }
+
 /* ===== TOPBAR USER MENU ===== */
 .topbar-wrapper { display: flex; flex-direction: column; }
 .topbar-avatar {

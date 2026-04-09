@@ -2,78 +2,89 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
-  const { login } = useAuth()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
+  const { login, signup } = useAuth()
+  const [tab, setTab] = useState('login') // 'login' | 'signup'
+  const [form, setForm] = useState({ name: '', email: '', password: '' })
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  function set(field) { return e => setForm(f => ({ ...f, [field]: e.target.value })) }
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!email.trim() || !password.trim()) return
-    setLoading(true)
     setError('')
-    const result = await login(email.trim(), password)
-    if (!result.ok) {
-      setError(result.error === 'Invalid login credentials'
-        ? 'E-mail ou senha incorretos.'
-        : result.error)
-      setLoading(false)
+    setLoading(true)
+    if (tab === 'login') {
+      const { ok, error: err } = await login(form.email, form.password)
+      if (!ok) setError(err || 'Erro ao entrar')
+    } else {
+      if (!form.name.trim()) { setError('Nome obrigatório'); setLoading(false); return }
+      const { ok, error: err } = await signup(form.email, form.password, form.name)
+      if (!ok) setError(err || 'Erro ao criar conta')
+      else setError('Conta criada! Verifique seu e-mail se necessário.')
     }
+    setLoading(false)
   }
 
   return (
-    <div className="login-screen">
+    <div className="login-page">
       <div className="login-card">
-        <div className="login-logo">
-          <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
-            <rect width="40" height="40" rx="10" fill="#2D6A4F"/>
-            <text x="20" y="27" textAnchor="middle" fill="white" fontSize="16" fontWeight="800" fontFamily="Poppins,sans-serif">R</text>
-          </svg>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: '17px', letterSpacing: '-0.5px' }}>RBW Digital</div>
-            <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Gestão de Operações</div>
-          </div>
+        <div className="login-brand">
+          <div className="login-logo">RBW</div>
+          <div className="login-brand-name">RBW Digital</div>
+          <div className="login-brand-sub">Gestão de Operações</div>
         </div>
 
-        <h2 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '4px' }}>Bem-vindo de volta</h2>
-        <p style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '24px' }}>
-          Entre com seu e-mail e senha para acessar.
-        </p>
+        <div className="tabs" style={{ marginBottom: '20px' }}>
+          <div className={`tab${tab === 'login' ? ' active' : ''}`} onClick={() => { setTab('login'); setError('') }}>Entrar</div>
+          <div className={`tab${tab === 'signup' ? ' active' : ''}`} onClick={() => { setTab('signup'); setError('') }}>Criar conta</div>
+        </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="form-group" style={{ marginBottom: '12px' }}>
+          {tab === 'signup' && (
+            <div className="form-group">
+              <label>NOME</label>
+              <input
+                placeholder="Seu nome completo"
+                value={form.name}
+                onChange={set('name')}
+                required
+                autoComplete="name"
+              />
+            </div>
+          )}
+          <div className="form-group">
             <label>E-MAIL</label>
             <input
               type="email"
               placeholder="seu@email.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              autoFocus
+              value={form.email}
+              onChange={set('email')}
               required
+              autoComplete="email"
             />
           </div>
-
-          <div className="form-group" style={{ marginBottom: '20px' }}>
+          <div className="form-group">
             <label>SENHA</label>
             <input
               type="password"
               placeholder="••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
+              value={form.password}
+              onChange={set('password')}
               required
+              minLength={6}
+              autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
             />
           </div>
 
           {error && (
             <div style={{
-              background: '#fef2f2',
-              color: 'var(--red)',
-              padding: '10px 12px',
-              borderRadius: '8px',
               fontSize: '12px',
-              marginBottom: '16px',
-              border: '1px solid var(--red)',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              marginBottom: '12px',
+              background: error.startsWith('Conta criada') ? 'var(--accent-light)' : 'var(--red-light, #fee2e2)',
+              color: error.startsWith('Conta criada') ? 'var(--accent)' : 'var(--red)',
             }}>
               {error}
             </div>
@@ -82,21 +93,12 @@ export default function Login() {
           <button
             type="submit"
             className="btn btn-primary"
+            style={{ width: '100%', padding: '10px', fontSize: '14px' }}
             disabled={loading}
-            style={{ width: '100%', justifyContent: 'center', height: '42px', fontSize: '14px' }}
           >
-            {loading ? (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ width: '14px', height: '14px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
-                Entrando...
-              </span>
-            ) : 'Entrar'}
+            {loading ? '...' : tab === 'login' ? 'Entrar' : 'Criar conta'}
           </button>
         </form>
-
-        <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text3)' }}>
-          Não tem acesso? Peça ao administrador para criar sua conta.
-        </div>
       </div>
     </div>
   )
