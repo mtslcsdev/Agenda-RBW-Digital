@@ -34,18 +34,21 @@ const mapTask = r => ({
   priority: r.priority || 'Normal', date: r.date || '',
   notes: r.notes || '', done: r.done || false,
   taskStatus: r.task_status || 'pendente',
+  archived: r.archived || false,
 })
 const mapClient = r => ({
   id: r.id, initials: r.initials || '', name: r.name,
   segment: r.segment || '', email: r.email || '',
   status: r.status || 'Ativo', statusColor: r.status_color || 'green',
-  tags: r.tags || [], color: r.color || '#2D6A4F', archived: r.archived || false,
+  tags: r.tags || [], color: r.color || '#2D6A4F',
+  archived: r.archived || false, hidden: r.hidden || false,
 })
 const mapNote = r => ({
   id: r.id, title: r.title, content: r.content || '',
   project: r.project || '', color: r.color || 'yellow',
   date: r.date || r.created_at?.slice(0, 10) || '',
-  type: r.type || 'text', items: r.items || [], pinned: r.pinned || false,
+  type: r.type || 'text', items: r.items || [],
+  pinned: r.pinned || false, archived: r.archived || false,
 })
 const mapComment = r => ({
   id: r.id, userId: r.user_id, userName: r.user_name,
@@ -259,6 +262,13 @@ export function AppProvider({ children }) {
     await supabase.from('clients').update({ archived }).eq('id', id)
   }
 
+  async function toggleClientHidden(id) {
+    const client = clients.find(c => c.id === id)
+    const hidden = !(client?.hidden)
+    setClientsState(prev => prev.map(c => c.id === id ? { ...c, hidden } : c))
+    await supabase.from('clients').update({ hidden }).eq('id', id)
+  }
+
   // ── NOTES ──
   async function addNote(data) {
     const n = {
@@ -280,6 +290,19 @@ export function AppProvider({ children }) {
   async function deleteNote(id) {
     setNotesState(prev => prev.filter(n => n.id !== id))
     await supabase.from('notes').delete().eq('id', id)
+  }
+
+  async function archiveNote(id) {
+    const note = notes.find(n => n.id === id)
+    const archived = !(note?.archived)
+    setNotesState(prev => prev.map(n => n.id === id ? { ...n, archived } : n))
+    await supabase.from('notes').update({ archived }).eq('id', id)
+  }
+
+  async function archiveTask(id) {
+    const archived = !(tasks.find(t => t.id === id)?.archived)
+    setTasksState(prev => prev.map(t => t.id === id ? { ...t, archived } : t))
+    await supabase.from('tasks').update({ archived }).eq('id', id)
   }
 
   async function toggleNoteItem(noteId, itemId) {
@@ -364,16 +387,25 @@ export function AppProvider({ children }) {
     return total + current
   }
 
-  const activeClients  = clients.filter(c => !c.archived)
-  const unreadCount    = notifications.filter(n => !n.read).length
+  const activeClients   = clients.filter(c => !c.archived && !c.hidden)
+  const hiddenClients   = clients.filter(c => c.hidden && !c.archived)
+  const archivedClients = clients.filter(c => c.archived)
+  const activeTasks     = tasks.filter(t => !t.archived)
+  const archivedTasks   = tasks.filter(t => t.archived)
+  const activeNotes     = notes.filter(n => !n.archived)
+  const archivedNotes   = notes.filter(n => n.archived)
+  const unreadCount     = notifications.filter(n => !n.read).length
 
   return (
     <AppContext.Provider value={{
       appLoading,
       theme, toggleTheme,
-      tasks, addTask, editTask, deleteTask, toggleTask, moveTask,
-      clients: activeClients, allClients: clients, addClient, editClient, archiveClient,
-      notes, addNote, editNote, deleteNote, toggleNoteItem, pinNote,
+      tasks: activeTasks, allTasks: tasks, archivedTasks,
+      addTask, editTask, deleteTask, toggleTask, moveTask, archiveTask,
+      clients: activeClients, allClients: clients, hiddenClients, archivedClients,
+      addClient, editClient, archiveClient, toggleClientHidden,
+      notes: activeNotes, allNotes: notes, archivedNotes,
+      addNote, editNote, deleteNote, toggleNoteItem, pinNote, archiveNote,
       comments, addComment, deleteComment, getComments,
       notifications, markNotificationRead, markAllRead, unreadCount,
       activityLog,

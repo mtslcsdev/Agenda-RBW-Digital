@@ -6,9 +6,9 @@ import { clientSlug } from '../pages/ClientDetail'
 import rbwLogo from '../assets/rbw-logo.svg'
 
 export default function Sidebar({ open, onClose }) {
-  const { theme, toggleTheme, clients, tasks } = useApp()
-  const { currentUser } = useAuth()
-  const { isAdmin } = usePermission()
+  const { theme, toggleTheme, clients, hiddenClients, tasks } = useApp()
+  const { currentUser, effectiveUser } = useAuth()
+  const { isAdmin, isActualAdmin, canSeeHidden } = usePermission()
   const today = new Date().toISOString().slice(0, 10)
   const overdueCount = tasks.filter(t => t.date < today && !t.done).length
   const todayCount = tasks.filter(t => t.date === today && !t.done).length
@@ -52,18 +52,23 @@ export default function Sidebar({ open, onClose }) {
             <span className="icon">◉</span> Todos os Clientes
           </NavLink>
           {clients.map(client => (
-            <NavLink
-              key={client.id}
-              to={`/clientes/${clientSlug(client.name)}`}
-              className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
-              onClick={handleNav}
-            >
+            <NavLink key={client.id} to={`/clientes/${clientSlug(client.name)}`} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} onClick={handleNav}>
               <span className="icon">▸</span>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {client.name}
-              </span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.name}</span>
             </NavLink>
           ))}
+          {/* Clientes ocultos — só admin real vê */}
+          {canSeeHidden && hiddenClients?.length > 0 && (
+            <>
+              <div className="nav-label" style={{ marginTop: '8px', color: 'var(--accent2)', fontSize: '10px' }}>🔒 Ocultos</div>
+              {hiddenClients.map(client => (
+                <NavLink key={client.id} to={`/clientes/${clientSlug(client.name)}`} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} onClick={handleNav} style={{ opacity: 0.7 }}>
+                  <span className="icon">▸</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.name}</span>
+                </NavLink>
+              ))}
+            </>
+          )}
         </nav>
 
         <nav className="nav-section" style={{ marginTop: '8px' }}>
@@ -73,7 +78,7 @@ export default function Sidebar({ open, onClose }) {
           </NavLink>
         </nav>
 
-        {isAdmin && (
+        {isActualAdmin && (
           <nav className="nav-section" style={{ marginTop: '8px' }}>
             <div className="nav-label">Administração</div>
             <NavLink to="/admin" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} onClick={handleNav}>
@@ -89,12 +94,12 @@ export default function Sidebar({ open, onClose }) {
               {theme === 'dark' ? '☀️' : '🌙'}
             </button>
           </div>
-          {currentUser && (
+          {effectiveUser && (
             <div className="user-card">
-              <div className="user-avatar" style={{ background: currentUser.color }}>{currentUser.initials}</div>
+              <div className="user-avatar" style={{ background: effectiveUser.color }}>{effectiveUser.initials}</div>
               <div className="user-info">
-                <p>{currentUser.name}</p>
-                <span style={{ color: ROLES[currentUser.role]?.color }}>{ROLES[currentUser.role]?.label}</span>
+                <p>{effectiveUser.name}</p>
+                <span style={{ color: ROLES[effectiveUser.role]?.color }}>{ROLES[effectiveUser.role]?.label}</span>
               </div>
             </div>
           )}

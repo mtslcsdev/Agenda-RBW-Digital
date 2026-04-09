@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { AppProvider, useApp } from './context/AppContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { usePermission } from './hooks/usePermission'
 import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
 import TaskModal from './components/TaskModal'
@@ -62,6 +63,7 @@ function LoadingScreen() {
 function AppLayout() {
   const { pathname } = useLocation()
   const { appLoading } = useApp()
+  const { canEdit, isActualAdmin } = usePermission()
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [taskOpen, setTaskOpen] = useState(false)
@@ -90,7 +92,7 @@ function AppLayout() {
   const isAdmin = pathname === '/admin'
   const pageTitle = isClientDetail ? undefined : (PAGE_TITLES[pathname] || 'RBW Digital')
   const newLabel = NEW_LABELS[pathname] || (pathname.startsWith('/clientes/') ? '+ Tarefa' : '+ Novo')
-  const hideNewBtn = isAdmin || isRelatorio
+  const hideNewBtn = isAdmin || isRelatorio || !canEdit
 
   return (
     <div className="app">

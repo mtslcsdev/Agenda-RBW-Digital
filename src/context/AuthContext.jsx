@@ -9,10 +9,14 @@ export const ROLES = {
   viewer: { label: 'Viewer', color: 'var(--text3)',    bg: 'var(--surface2)' },
 }
 
+export const ROLE_LABELS = {
+  admin: 'Admin', editor: 'Editor', viewer: 'Viewer',
+}
+
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null)
   const [users, setUsers] = useState([])
-  // Sem loading screen — login aparece imediatamente
+  const [viewingAs, setViewingAs] = useState(null) // admin "ver como" outro usuário
   const [authLoading] = useState(false)
 
   useEffect(() => {
@@ -80,7 +84,13 @@ export function AuthProvider({ children }) {
     return { ok: true }
   }
 
-  async function logout() { await supabase.auth.signOut() }
+  async function logout() {
+    setViewingAs(null)
+    await supabase.auth.signOut()
+  }
+
+  function startViewingAs(user) { setViewingAs(user) }
+  function stopViewingAs()      { setViewingAs(null) }
 
   async function updateUserRole(userId, role) {
     const { error } = await supabase.from('profiles').update({ role }).eq('id', userId)
@@ -107,9 +117,13 @@ export function AuthProvider({ children }) {
     return { ok: true }
   }
 
+  // effectiveUser: quem o app "enxerga" (pode ser outro usuário se admin está em modo "ver como")
+  const effectiveUser = viewingAs || currentUser
+
   return (
     <AuthContext.Provider value={{
-      currentUser, users, authLoading,
+      currentUser, effectiveUser, users, authLoading,
+      viewingAs, startViewingAs, stopViewingAs,
       login, signup, logout,
       updateUserRole, removeUser, createInvitedUser, fetchAllProfiles,
     }}>
