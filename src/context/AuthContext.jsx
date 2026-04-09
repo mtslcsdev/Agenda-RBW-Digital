@@ -58,23 +58,27 @@ export function AuthProvider({ children }) {
   }
 
   // Helper: fetch para auth com timeout e AbortController
-  async function authFetch(endpoint, body) {
+  // isTokenEndpoint=true → omite Authorization header (conflito com sb_publishable_ key)
+  async function authFetch(endpoint, body, isTokenEndpoint = false) {
     const url = `${import.meta.env.VITE_SUPABASE_URL}/auth/v1/${endpoint}`
     const key  = import.meta.env.VITE_SUPABASE_ANON_KEY
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 20000)
     try {
+      const headers = {
+        'Content-Type': 'application/json',
+        'apikey': key,
+      }
+      if (!isTokenEndpoint) {
+        headers['Authorization'] = `Bearer ${key}`
+      }
       const res = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': key,
-          'Authorization': `Bearer ${key}`,
-        },
+        headers,
         body: JSON.stringify(body),
         signal: controller.signal,
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       return { res, data }
     } finally {
       clearTimeout(timer)
@@ -85,9 +89,10 @@ export function AuthProvider({ children }) {
   async function login(username, password) {
     try {
       const email = usernameToEmail(username)
-      const { res, data } = await authFetch('token?grant_type=password', { email, password })
+      // grant_type no body (não na URL), sem Authorization header
+      const { res, data } = await authFetch('token', { email, password, grant_type: 'password' }, true)
       if (!res.ok) {
-        const msg = data.error_description || data.msg || data.message || ''
+        const msg = data.error_description || data.msg || data.message || `Erro ${res.status}`
         return {
           ok: false,
           error: (msg.includes('Invalid login') || msg.includes('invalid_grant'))
