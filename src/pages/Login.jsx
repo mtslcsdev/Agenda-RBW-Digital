@@ -30,7 +30,11 @@ export default function Login() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-brand">
-          <div className="login-logo">RBW</div>
+          <img
+            src={`${import.meta.env.BASE_URL}rbw-logo.svg`}
+            alt="RBW Digital"
+            style={{ width: '140px', height: '140px', borderRadius: '24px', display: 'block', margin: '0 auto 12px' }}
+          />
           <div className="login-brand-name">RBW Digital</div>
           <div className="login-brand-sub">Gestão de Operações</div>
         </div>
