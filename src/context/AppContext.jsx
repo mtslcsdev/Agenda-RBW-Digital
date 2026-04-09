@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { supabase } from '../lib/supabase'
 
 const AppContext = createContext(null)
 
@@ -26,97 +27,188 @@ const STATUS_OPTIONS = [
 ]
 export { STATUS_OPTIONS }
 
-const SEED_TASKS = [
-  { id: 1, title: 'Configurar webhook N8N – Neoprop', done: true, tag: 'GHL', tagColor: 'green', client: 'Neoprop', date: '2026-04-07', priority: 'Normal', taskStatus: 'concluido' },
-  { id: 2, title: 'Revisar fluxo de aprovação de trader', done: false, tag: 'N8N', tagColor: 'orange', client: 'Neoprop', date: '2026-04-08', priority: 'Alta', taskStatus: 'em-progresso' },
-  { id: 3, title: 'Switch node – 3 planos Asaas', done: false, tag: 'N8N', tagColor: 'orange', client: 'Neoprop', date: '2026-04-09', priority: 'Urgente', taskStatus: 'pendente' },
-  { id: 4, title: 'Enviar proposta para novo cliente', done: false, tag: 'Vendas', tagColor: 'purple', client: 'Pessoal', date: '2026-04-10', priority: 'Normal', taskStatus: 'pendente' },
-  { id: 5, title: 'Reunião com Joy – engajamento de leads', done: false, tag: 'Reunião', tagColor: 'yellow', client: 'Pessoal', date: '2026-04-08', priority: 'Normal', taskStatus: 'pendente' },
-  { id: 6, title: 'Rascunho capítulo 1 – Ebook 5km', done: false, tag: 'Pessoal', tagColor: 'purple', client: 'Pessoal', date: '2026-04-11', priority: 'Normal', taskStatus: 'pendente' },
-  { id: 7, title: 'Checar integração Asaas API', done: true, tag: 'Dev', tagColor: 'green', client: 'Neoprop', date: '2026-04-07', priority: 'Normal', taskStatus: 'concluido' },
-]
-
-const SEED_CLIENTS = [
-  { id: 1, initials: 'NP', name: 'Neoprop', segment: 'Trader Training Program', email: 'robervan@neoprop.com', status: 'Em andamento', statusColor: 'orange', color: '#2D6A4F', tags: ['GHL', 'N8N'], archived: false },
-  { id: 2, initials: 'CB', name: 'Cliente B', segment: 'E-commerce / Loja virtual', email: 'contato@clienteb.com', status: 'Ativo', statusColor: 'green', color: '#5B4FCF', tags: ['Automação'], archived: false },
-  { id: 3, initials: 'MK', name: 'Cliente C', segment: 'Marketing Digital', email: 'contato@clientec.com', status: 'Onboarding', statusColor: 'yellow', color: '#E07A3A', tags: [], archived: false },
-]
-
-const SEED_NOTES = [
-  { id: 1, title: '🔧 Neoprop – Webhook Rejeição', content: 'Mapear campo de motivo no webhook de rejeição. Verificar com Robervan a estrutura esperada para o Switch node dos 3 planos.', date: '2026-04-07', project: 'Neoprop', color: 'yellow', type: 'text', items: [], pinned: false },
-  { id: 2, title: '✅ Setup GHL – Checklist', content: '', date: '2026-04-06', project: 'Neoprop', color: 'blue', type: 'checklist', items: [{ id: 1, text: 'Criar conta no GoHighLevel', done: true }, { id: 2, text: 'Configurar subaccount Neoprop', done: true }, { id: 3, text: 'Conectar domínio personalizado', done: false }, { id: 4, text: 'Ativar automações de follow-up', done: false }], pinned: true },
-  { id: 3, title: '📊 Meta Ads – Estudo', content: 'Sessões curtas diárias. Foco atual: estrutura de campanha, conjuntos de anúncios, públicos lookalike e retargeting.', date: '2026-04-05', project: 'Pessoal', color: 'purple', type: 'text', items: [], pinned: false },
-]
-
-function loadFromStorage(key, fallback) {
-  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback } catch { return fallback }
+// ── Row mappers (snake_case DB → camelCase app) ──────────────
+function mapTask(r) {
+  return {
+    id: r.id, title: r.title, client: r.client || '', tag: r.tag || '',
+    tagColor: r.tag_color || 'green', priority: r.priority || 'Normal',
+    date: r.date || '', notes: r.notes || '', done: r.done || false,
+    taskStatus: r.task_status || 'pendente',
+  }
 }
-function saveToStorage(key, value) { try { localStorage.setItem(key, JSON.stringify(value)) } catch {} }
+
+function mapClient(r) {
+  return {
+    id: r.id, initials: r.initials || '', name: r.name, segment: r.segment || '',
+    email: r.email || '', status: r.status || 'Ativo', statusColor: r.status_color || 'green',
+    tags: r.tags || [], color: r.color || '#2D6A4F', archived: r.archived || false,
+  }
+}
+
+function mapNote(r) {
+  return {
+    id: r.id, title: r.title, content: r.content || '', project: r.project || '',
+    color: r.color || 'yellow', date: r.date || r.created_at?.slice(0, 10) || '',
+    type: r.type || 'text', items: r.items || [], pinned: r.pinned || false,
+  }
+}
+
+function mapComment(r) {
+  return {
+    id: r.id, userId: r.user_id, userName: r.user_name, userColor: r.user_color,
+    userInitials: r.user_initials, text: r.text, createdAt: r.created_at,
+  }
+}
+
+function mapEntry(r) {
+  return {
+    id: r.id, taskId: r.task_id, taskTitle: r.task_title,
+    startTime: r.start_time, endTime: r.end_time, duration: r.duration,
+  }
+}
+
+function mapActivity(r) {
+  return {
+    id: r.id, userName: r.user_name, userColor: r.user_color,
+    action: r.action, entityType: r.entity_type, entityTitle: r.entity_title,
+    createdAt: r.created_at,
+  }
+}
+
+function mapNotification(r) {
+  return { id: r.id, icon: r.icon, message: r.message, type: r.type, read: r.read, createdAt: r.created_at }
+}
 
 export function AppProvider({ children }) {
-  const [theme, setTheme] = useState(() => loadFromStorage('fd_theme', 'light'))
-  const [tasks, setTasksState] = useState(() => loadFromStorage('fd_tasks', SEED_TASKS))
-  const [clients, setClientsState] = useState(() => loadFromStorage('fd_clients', SEED_CLIENTS))
-  const [notes, setNotesState] = useState(() => loadFromStorage('fd_notes', SEED_NOTES))
-  const [comments, setCommentsState] = useState(() => loadFromStorage('fd_comments', {}))
-  const [notifications, setNotifications] = useState(() => loadFromStorage('fd_notifications', []))
-  const [activityLog, setActivityLog] = useState(() => loadFromStorage('fd_activityLog', []))
-  const [timeEntries, setTimeEntries] = useState(() => loadFromStorage('fd_timeEntries', []))
-  const [activeTimer, setActiveTimer] = useState(() => loadFromStorage('fd_activeTimer', null))
+  const [loaded, setLoaded] = useState(false)
+  const [tasks, setTasksState] = useState([])
+  const [clients, setClientsState] = useState([])
+  const [notes, setNotesState] = useState([])
+  const [comments, setCommentsState] = useState({})
+  const [notifications, setNotifications] = useState([])
+  const [activityLog, setActivityLog] = useState([])
+  const [timeEntries, setTimeEntries] = useState([])
+  const [activeTimer, setActiveTimer] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('fd_activeTimer')) } catch { return null }
+  })
+  const [theme, setTheme] = useState(() => localStorage.getItem('fd_theme') || 'light')
   const [searchQuery, setSearchQuery] = useState('')
 
-  useEffect(() => { document.documentElement.setAttribute('data-theme', theme); saveToStorage('fd_theme', theme) }, [theme])
-  useEffect(() => { saveToStorage('fd_tasks', tasks) }, [tasks])
-  useEffect(() => { saveToStorage('fd_clients', clients) }, [clients])
-  useEffect(() => { saveToStorage('fd_notes', notes) }, [notes])
-  useEffect(() => { saveToStorage('fd_comments', comments) }, [comments])
-  useEffect(() => { saveToStorage('fd_notifications', notifications) }, [notifications])
-  useEffect(() => { saveToStorage('fd_activityLog', activityLog) }, [activityLog])
-  useEffect(() => { saveToStorage('fd_timeEntries', timeEntries) }, [timeEntries])
-  useEffect(() => { saveToStorage('fd_activeTimer', activeTimer) }, [activeTimer])
+  useEffect(() => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('fd_theme', theme) }, [theme])
+  useEffect(() => { localStorage.setItem('fd_activeTimer', JSON.stringify(activeTimer)) }, [activeTimer])
+
+  useEffect(() => { loadAll() }, [])
+
+  async function loadAll() {
+    try {
+      const [tasksRes, clientsRes, notesRes, commentsRes, activityRes, entriesRes] = await Promise.all([
+        supabase.from('tasks').select('*').order('created_at', { ascending: false }),
+        supabase.from('clients').select('*').order('created_at', { ascending: false }),
+        supabase.from('notes').select('*').order('pinned', { ascending: false }).order('created_at', { ascending: false }),
+        supabase.from('comments').select('*').order('created_at'),
+        supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(50),
+        supabase.from('time_entries').select('*'),
+      ])
+
+      if (tasksRes.data) setTasksState(tasksRes.data.map(mapTask))
+      if (clientsRes.data) setClientsState(clientsRes.data.map(mapClient))
+      if (notesRes.data) setNotesState(notesRes.data.map(mapNote))
+      if (commentsRes.data) {
+        const grouped = {}
+        commentsRes.data.forEach(c => {
+          if (!grouped[c.task_id]) grouped[c.task_id] = []
+          grouped[c.task_id].push(mapComment(c))
+        })
+        setCommentsState(grouped)
+      }
+      if (activityRes.data) setActivityLog(activityRes.data.map(mapActivity))
+      if (entriesRes.data) setTimeEntries(entriesRes.data.map(mapEntry))
+
+      // Notifications: per user
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: notifs } = await supabase.from('notifications').select('*')
+          .eq('user_id', user.id).order('created_at', { ascending: false }).limit(30)
+        if (notifs) setNotifications(notifs.map(mapNotification))
+      }
+    } catch (e) {
+      console.error('Supabase load error:', e)
+    }
+    setLoaded(true)
+  }
 
   function toggleTheme() { setTheme(t => t === 'light' ? 'dark' : 'light') }
 
-  // ── INTERNAL HELPERS ──
-  const _notify = useCallback((icon, message, type = 'info') => {
-    const n = { id: Date.now() + Math.random(), icon, message, type, read: false, createdAt: new Date().toISOString() }
-    setNotifications(prev => [n, ...prev].slice(0, 30))
+  // ── INTERNAL HELPERS ────────────────────────────────────────
+  const _notify = useCallback(async (icon, message, type = 'info') => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const n = { icon, message, type, read: false, user_id: user.id }
+    const { data: row } = await supabase.from('notifications').insert(n).select().single()
+    if (row) setNotifications(prev => [mapNotification(row), ...prev].slice(0, 30))
   }, [])
 
-  const _log = useCallback((userName, userColor, action, entityType, entityTitle) => {
-    const entry = { id: Date.now() + Math.random(), userName, userColor: userColor || '#6B6960', action, entityType, entityTitle, createdAt: new Date().toISOString() }
-    setActivityLog(prev => [entry, ...prev].slice(0, 50))
+  const _log = useCallback(async (userName, userColor, action, entityType, entityTitle) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const entry = { user_id: user?.id, user_name: userName, user_color: userColor || '#6B6960', action, entity_type: entityType, entity_title: entityTitle }
+    const { data: row } = await supabase.from('activity_log').insert(entry).select().single()
+    if (row) setActivityLog(prev => [mapActivity(row), ...prev].slice(0, 50))
   }, [])
 
-  // ── TASKS ──
-  function addTask(data, actor) {
-    const task = { ...data, id: Date.now(), done: false, taskStatus: data.taskStatus || 'pendente' }
-    setTasksState(prev => [task, ...prev])
+  // ── TASKS ────────────────────────────────────────────────────
+  async function addTask(data, actor) {
+    const tempId = `temp_${Date.now()}`
+    const optimistic = { ...data, id: tempId, done: false, taskStatus: data.taskStatus || 'pendente' }
+    setTasksState(prev => [optimistic, ...prev])
+
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: row } = await supabase.from('tasks').insert({
+      title: data.title, client: data.client || '', tag: data.tag || '',
+      tag_color: data.tagColor || 'green', priority: data.priority || 'Normal',
+      date: data.date || null, notes: data.notes || '', done: false,
+      task_status: data.taskStatus || 'pendente', created_by: user?.id,
+    }).select().single()
+
+    if (row) setTasksState(prev => prev.map(t => t.id === tempId ? mapTask(row) : t))
     _notify('✅', `Nova tarefa criada: ${data.title}`, 'task.created')
     if (actor) _log(actor.name, actor.color, 'criou a tarefa', 'tarefa', data.title)
   }
-  function editTask(id, data, actor) {
+
+  async function editTask(id, data, actor) {
     setTasksState(prev => prev.map(t => t.id === id ? { ...t, ...data } : t))
+    await supabase.from('tasks').update({
+      title: data.title, client: data.client, tag: data.tag,
+      tag_color: data.tagColor, priority: data.priority, date: data.date || null,
+      notes: data.notes, done: data.done, task_status: data.taskStatus,
+    }).eq('id', id)
     if (actor) _log(actor.name, actor.color, 'editou a tarefa', 'tarefa', data.title || '')
   }
-  function deleteTask(id, actor) {
+
+  async function deleteTask(id, actor) {
     const task = tasks.find(t => t.id === id)
     setTasksState(prev => prev.filter(t => t.id !== id))
     setCommentsState(prev => { const c = { ...prev }; delete c[id]; return c })
+    await supabase.from('tasks').delete().eq('id', id)
     if (actor && task) _log(actor.name, actor.color, 'removeu a tarefa', 'tarefa', task.title)
   }
-  function toggleTask(id, actor) {
-    setTasksState(prev => prev.map(t => {
-      if (t.id !== id) return t
-      const done = !t.done
-      if (actor) _notify(done ? '🏁' : '↩', done ? `Tarefa concluída: ${t.title}` : `Tarefa reaberta: ${t.title}`, done ? 'task.done' : 'task.reopened')
-      if (actor) _log(actor.name, actor.color, done ? 'concluiu a tarefa' : 'reabriu a tarefa', 'tarefa', t.title)
-      return { ...t, done, taskStatus: done ? 'concluido' : 'pendente' }
-    }))
+
+  async function toggleTask(id, actor) {
+    const task = tasks.find(t => t.id === id)
+    if (!task) return
+    const done = !task.done
+    const taskStatus = done ? 'concluido' : 'pendente'
+    setTasksState(prev => prev.map(t => t.id === id ? { ...t, done, taskStatus } : t))
+    await supabase.from('tasks').update({ done, task_status: taskStatus }).eq('id', id)
+    if (actor) {
+      _notify(done ? '🏁' : '↩', done ? `Tarefa concluída: ${task.title}` : `Tarefa reaberta: ${task.title}`, done ? 'task.done' : 'task.reopened')
+      _log(actor.name, actor.color, done ? 'concluiu a tarefa' : 'reabriu a tarefa', 'tarefa', task.title)
+    }
   }
-  function moveTask(id, newStatus, actor) {
+
+  async function moveTask(id, newStatus, actor) {
     const task = tasks.find(t => t.id === id)
     setTasksState(prev => prev.map(t => t.id !== id ? t : { ...t, taskStatus: newStatus, done: newStatus === 'concluido' }))
+    await supabase.from('tasks').update({ task_status: newStatus, done: newStatus === 'concluido' }).eq('id', id)
     if (actor && task) {
       const colLabel = KANBAN_COLUMNS.find(c => c.id === newStatus)?.label || newStatus
       _notify('🔀', `Tarefa movida para ${colLabel}: ${task.title}`, 'task.moved')
@@ -124,54 +216,136 @@ export function AppProvider({ children }) {
     }
   }
 
-  // ── CLIENTS ──
-  function addClient(data) { setClientsState(prev => [...prev, { ...data, id: Date.now(), archived: false }]) }
-  function editClient(id, data) { setClientsState(prev => prev.map(c => c.id === id ? { ...c, ...data } : c)) }
-  function archiveClient(id) { setClientsState(prev => prev.map(c => c.id === id ? { ...c, archived: !c.archived } : c)) }
-
-  // ── NOTES ──
-  function addNote(data) {
-    setNotesState(prev => [{ ...data, id: Date.now(), date: new Date().toISOString().slice(0, 10), type: data.type || 'text', items: data.items || [], pinned: false }, ...prev])
+  // ── CLIENTS ──────────────────────────────────────────────────
+  async function addClient(data) {
+    const tempId = `temp_${Date.now()}`
+    setClientsState(prev => [...prev, { ...data, id: tempId, archived: false }])
+    const { data: row } = await supabase.from('clients').insert({
+      initials: data.initials, name: data.name, segment: data.segment || '',
+      email: data.email || '', status: data.status || 'Ativo',
+      status_color: data.statusColor || 'green', tags: data.tags || [],
+      color: data.color || '#2D6A4F', archived: false,
+    }).select().single()
+    if (row) setClientsState(prev => prev.map(c => c.id === tempId ? mapClient(row) : c))
   }
-  function editNote(id, data) { setNotesState(prev => prev.map(n => n.id === id ? { ...n, ...data } : n)) }
-  function deleteNote(id) { setNotesState(prev => prev.filter(n => n.id !== id)) }
-  function toggleNoteItem(noteId, itemId) {
-    setNotesState(prev => prev.map(n => n.id === noteId ? { ...n, items: n.items.map(it => it.id === itemId ? { ...it, done: !it.done } : it) } : n))
-  }
-  function pinNote(id) { setNotesState(prev => prev.map(n => n.id === id ? { ...n, pinned: !n.pinned } : n)) }
 
-  // ── COMMENTS ──
-  function addComment(taskId, text, actor) {
-    const comment = { id: Date.now(), userId: actor?.id, userName: actor?.name || 'Anônimo', userColor: actor?.color || '#6B6960', userInitials: actor?.initials || '?', text, createdAt: new Date().toISOString() }
-    setCommentsState(prev => ({ ...prev, [taskId]: [...(prev[taskId] || []), comment] }))
+  async function editClient(id, data) {
+    setClientsState(prev => prev.map(c => c.id === id ? { ...c, ...data } : c))
+    await supabase.from('clients').update({
+      initials: data.initials, name: data.name, segment: data.segment,
+      email: data.email, status: data.status, status_color: data.statusColor,
+      tags: data.tags, color: data.color,
+    }).eq('id', id)
+  }
+
+  async function archiveClient(id) {
+    const client = clients.find(c => c.id === id)
+    const archived = !client?.archived
+    setClientsState(prev => prev.map(c => c.id === id ? { ...c, archived } : c))
+    await supabase.from('clients').update({ archived }).eq('id', id)
+  }
+
+  // ── NOTES ────────────────────────────────────────────────────
+  async function addNote(data) {
+    const tempId = `temp_${Date.now()}`
+    const today = new Date().toISOString().slice(0, 10)
+    const optimistic = { ...data, id: tempId, date: today, type: data.type || 'text', items: data.items || [], pinned: false }
+    setNotesState(prev => [optimistic, ...prev])
+    const { data: row } = await supabase.from('notes').insert({
+      title: data.title, content: data.content || '', project: data.project || '',
+      color: data.color || 'yellow', date: today, type: data.type || 'text',
+      items: data.items || [], pinned: false,
+    }).select().single()
+    if (row) setNotesState(prev => prev.map(n => n.id === tempId ? mapNote(row) : n))
+  }
+
+  async function editNote(id, data) {
+    setNotesState(prev => prev.map(n => n.id === id ? { ...n, ...data } : n))
+    await supabase.from('notes').update({
+      title: data.title, content: data.content, project: data.project,
+      color: data.color, type: data.type, items: data.items, pinned: data.pinned,
+    }).eq('id', id)
+  }
+
+  async function deleteNote(id) {
+    setNotesState(prev => prev.filter(n => n.id !== id))
+    await supabase.from('notes').delete().eq('id', id)
+  }
+
+  async function toggleNoteItem(noteId, itemId) {
+    const note = notes.find(n => n.id === noteId)
+    if (!note) return
+    const newItems = note.items.map(it => it.id === itemId ? { ...it, done: !it.done } : it)
+    setNotesState(prev => prev.map(n => n.id === noteId ? { ...n, items: newItems } : n))
+    await supabase.from('notes').update({ items: newItems }).eq('id', noteId)
+  }
+
+  async function pinNote(id) {
+    const note = notes.find(n => n.id === id)
+    if (!note) return
+    const pinned = !note.pinned
+    setNotesState(prev => prev.map(n => n.id === id ? { ...n, pinned } : n))
+    await supabase.from('notes').update({ pinned }).eq('id', id)
+  }
+
+  // ── COMMENTS ─────────────────────────────────────────────────
+  async function addComment(taskId, text, actor) {
+    const { data: { user } } = await supabase.auth.getUser()
+    const row = {
+      task_id: taskId, user_id: user?.id, user_name: actor?.name || 'Anônimo',
+      user_color: actor?.color || '#6B6960', user_initials: actor?.initials || '?', text,
+    }
+    const { data: saved } = await supabase.from('comments').insert(row).select().single()
+    if (saved) {
+      setCommentsState(prev => ({ ...prev, [taskId]: [...(prev[taskId] || []), mapComment(saved)] }))
+    }
     const task = tasks.find(t => t.id === taskId)
     _notify('💬', `Novo comentário em: ${task?.title || 'tarefa'}`, 'comment.added')
   }
-  function deleteComment(taskId, commentId) {
+
+  async function deleteComment(taskId, commentId) {
     setCommentsState(prev => ({ ...prev, [taskId]: (prev[taskId] || []).filter(c => c.id !== commentId) }))
+    await supabase.from('comments').delete().eq('id', commentId)
   }
+
   function getComments(taskId) { return comments[taskId] || [] }
 
-  // ── NOTIFICATIONS ──
-  function markNotificationRead(id) { setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n)) }
-  function markAllRead() { setNotifications(prev => prev.map(n => ({ ...n, read: true }))) }
+  // ── NOTIFICATIONS ─────────────────────────────────────────────
+  async function markNotificationRead(id) {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+    await supabase.from('notifications').update({ read: true }).eq('id', id)
+  }
 
-  // ── TIME TRACKING ──
-  function startTimer(taskId, actor) {
-    if (activeTimer) stopTimer(actor)
+  async function markAllRead() {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    const ids = notifications.filter(n => !n.read).map(n => n.id)
+    if (ids.length) await supabase.from('notifications').update({ read: true }).in('id', ids)
+  }
+
+  // ── TIME TRACKING ─────────────────────────────────────────────
+  async function startTimer(taskId, actor) {
+    if (activeTimer) await stopTimer(actor)
     setActiveTimer({ taskId, startTime: Date.now() })
     const task = tasks.find(t => t.id === taskId)
     if (actor) _notify('⏱', `Timer iniciado: ${task?.title || 'tarefa'}`, 'timer.start')
   }
-  function stopTimer(actor) {
+
+  async function stopTimer(actor) {
     if (!activeTimer) return
     const duration = Date.now() - activeTimer.startTime
-    const entry = { id: Date.now(), taskId: activeTimer.taskId, startTime: activeTimer.startTime, endTime: Date.now(), duration }
-    setTimeEntries(prev => [...prev, entry])
-    setActiveTimer(null)
     const task = tasks.find(t => t.id === activeTimer.taskId)
+    const { data: { user } } = await supabase.auth.getUser()
+    const entry = {
+      task_id: activeTimer.taskId, task_title: task?.title || '',
+      user_id: user?.id, start_time: activeTimer.startTime,
+      end_time: Date.now(), duration,
+    }
+    const { data: row } = await supabase.from('time_entries').insert(entry).select().single()
+    if (row) setTimeEntries(prev => [...prev, mapEntry(row)])
+    setActiveTimer(null)
     if (actor) _notify('⏹', `Timer parado: ${task?.title || 'tarefa'} (${formatDuration(duration)})`, 'timer.stop')
   }
+
   function getTaskTotalTime(taskId) {
     const total = timeEntries.filter(e => e.taskId === taskId).reduce((sum, e) => sum + e.duration, 0)
     const current = activeTimer?.taskId === taskId ? Date.now() - activeTimer.startTime : 0
@@ -180,6 +354,19 @@ export function AppProvider({ children }) {
 
   const activeClients = clients.filter(c => !c.archived)
   const unreadCount = notifications.filter(n => !n.read).length
+
+  if (!loaded) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: '100vh', background: 'var(--bg)', color: 'var(--text3)',
+        fontSize: '13px', gap: '8px',
+      }}>
+        <div style={{ width: '16px', height: '16px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        Carregando dados...
+      </div>
+    )
+  }
 
   return (
     <AppContext.Provider value={{

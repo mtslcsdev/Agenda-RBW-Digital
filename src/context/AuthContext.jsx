@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
@@ -8,63 +9,124 @@ export const ROLES = {
   viewer: { label: 'Viewer', color: 'var(--text3)', bg: 'var(--surface2)' },
 }
 
-const SEED_USERS = [
-  { id: 1, name: 'Mateus', email: 'mateus@rbw.com', role: 'admin', pin: '1234', initials: 'M', color: '#2D6A4F', createdAt: '2026-04-09' },
-]
-
-function load(key, fallback) {
-  try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : fallback } catch { return fallback }
-}
-function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)) } catch {} }
+const COLORS = ['#2D6A4F', '#5B4FCF', '#E07A3A', '#D94F3D', '#E8A923', '#3A7CA5']
 
 export function AuthProvider({ children }) {
-  const [users, setUsersState] = useState(() => load('fd_users', SEED_USERS))
-  const [currentUser, setCurrentUser] = useState(() => load('fd_currentUser', null))
+  const [currentUser, setCurrentUser] = useState(null)
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => { save('fd_users', users) }, [users])
-  useEffect(() => { save('fd_currentUser', currentUser) }, [currentUser])
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        loadProfile(session.user.id)
+      } else {
+        setLoading(false)
+      }
+    })
 
-  function login(userId, pin) {
-    const user = users.find(u => u.id === userId)
-    if (!user) return { ok: false, error: 'Usuário não encontrado' }
-    if (user.pin && user.pin !== pin) return { ok: false, error: 'PIN incorreto' }
-    setCurrentUser(user)
+    // Listen to auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        await loadProfile(session.user.id)
+      } else {
+        setCurrentUser(null)
+        setLoading(false)
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  async function loadProfile(userId) {
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
+    if (data) {
+      setCurrentUser(data)
+      loadAllProfiles()
+    }
+    setLoading(false)
+  }
+
+  async function loadAllProfiles() {
+    const { data } = await supabase.from('profiles').select('*').order('created_at')
+    if (data) setUsers(data)
+  }
+
+  async function login(email, password) {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) return { ok: false, error: error.message }
     return { ok: true }
   }
 
-  function logout() { setCurrentUser(null) }
-
-  function addUser(data) {
-    const newUser = {
-      ...data,
-      id: Date.now(),
-      initials: data.name.slice(0, 2).toUpperCase(),
-      color: ['#2D6A4F', '#5B4FCF', '#E07A3A', '#D94F3D', '#E8A923', '#3A7CA5'][users.length % 6],
-      createdAt: new Date().toISOString().slice(0, 10),
-    }
-    setUsersState(prev => [...prev, newUser])
-    return newUser
+  async function logout() {
+    await supabase.auth.signOut()
   }
 
-  function updateUserRole(userId, role) {
-    setUsersState(prev => prev.map(u => u.id === userId ? { ...u, role } : u))
+  // Admin cria usuário: gera senha temporária e mostra pro admin compartilhar
+  async function inviteUser(data) {
+    const tempPassword = generatePassword()
+    const { error } = await supabase.auth.signUp({
+      email: data.email,
+      password: tempPassword,
+      options: { data: { name: data.name } },
+    })
+    if (error) return { ok: false, error: error.message }
+
+    // Aguarda o trigger criar o profile e então atualiza o role
+    await new Promise(r => setTimeout(r, 1500))
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', data.email)
+      .single()
+
+    if (profile) {
+      await supabase.from('profiles').update({
+        role: data.role,
+        color: COLORS[users.length % COLORS.length],
+      }).eq('id', profile.id)
+    }
+
+    await loadAllProfiles()
+    return { ok: true, tempPassword }
+  }
+
+  async function updateUserRole(userId, role) {
+    const { error } = await supabase.from('profiles').update({ role }).eq('id', userId)
+    if (error) return
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u))
     if (currentUser?.id === userId) setCurrentUser(prev => ({ ...prev, role }))
   }
 
-  function removeUser(userId) {
-    setUsersState(prev => prev.filter(u => u.id !== userId))
+  async function removeUser(userId) {
+    await supabase.from('profiles').delete().eq('id', userId)
+    setUsers(prev => prev.filter(u => u.id !== userId))
   }
 
-  function updateUser(userId, data) {
-    setUsersState(prev => prev.map(u => u.id === userId ? { ...u, ...data } : u))
-    if (currentUser?.id === userId) setCurrentUser(prev => ({ ...prev, ...data }))
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: '100vh', background: 'var(--bg)', color: 'var(--text3)',
+        fontSize: '13px', gap: '8px',
+      }}>
+        <div style={{ width: '16px', height: '16px', border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        Carregando...
+      </div>
+    )
   }
 
   return (
-    <AuthContext.Provider value={{ currentUser, users, login, logout, addUser, updateUserRole, removeUser, updateUser }}>
+    <AuthContext.Provider value={{ currentUser, users, login, logout, inviteUser, updateUserRole, removeUser, loadAllProfiles }}>
       {children}
     </AuthContext.Provider>
   )
 }
 
 export function useAuth() { return useContext(AuthContext) }
+
+function generatePassword() {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#'
+  return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+}
