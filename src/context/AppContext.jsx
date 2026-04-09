@@ -109,7 +109,11 @@ export function AppProvider({ children }) {
     localStorage.setItem('fd_activeTimer', JSON.stringify(activeTimer))
   }, [activeTimer])
 
-  useEffect(() => { loadAll() }, [])
+  useEffect(() => {
+    // Timeout de segurança: mostra o app em até 7s mesmo que queries travem
+    const safetyTimer = setTimeout(() => setAppLoading(false), 7000)
+    loadAll().finally(() => clearTimeout(safetyTimer))
+  }, [])
 
   async function loadAll() {
     try {
@@ -141,13 +145,15 @@ export function AppProvider({ children }) {
       if (aRes.data) setActivityLog(aRes.data.map(mapActivity))
       if (eRes.data) setTimeEntries(eRes.data.map(mapTimeEntry))
 
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: nf } = await supabase.from('notifications')
-          .select('*').eq('user_id', user.id)
-          .order('created_at', { ascending: false }).limit(30)
-        if (nf) setNotifications(nf.map(mapNotification))
-      }
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: nf } = await supabase.from('notifications')
+            .select('*').eq('user_id', user.id)
+            .order('created_at', { ascending: false }).limit(30)
+          if (nf) setNotifications(nf.map(mapNotification))
+        }
+      } catch {}
     } catch (err) {
       console.error('Erro ao carregar dados do Supabase:', err)
       setAppLoading(false)
