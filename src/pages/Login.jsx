@@ -52,8 +52,10 @@ export default function Login() {
         <form onSubmit={handleSubmit}>
           {tab === 'signup' && (
             <div className="form-group">
-              <label>NOME</label>
+              <label htmlFor="login-name">NOME</label>
               <input
+                id="login-name"
+                name="name"
                 placeholder="Seu nome completo"
                 value={form.name}
                 onChange={set('name')}
@@ -63,8 +65,10 @@ export default function Login() {
             </div>
           )}
           <div className="form-group">
-            <label>E-MAIL</label>
+            <label htmlFor="login-email">E-MAIL</label>
             <input
+              id="login-email"
+              name="email"
               type="email"
               placeholder="seu@email.com"
               value={form.email}
@@ -74,8 +78,10 @@ export default function Login() {
             />
           </div>
           <div className="form-group">
-            <label>SENHA</label>
+            <label htmlFor="login-password">SENHA</label>
             <input
+              id="login-password"
+              name="password"
               type="password"
               placeholder="••••••••"
               value={form.password}

@@ -59,8 +59,11 @@ export function AuthProvider({ children }) {
 
   async function login(email, password) {
     try {
+      // Limpa sessão anterior que possa estar travando a requisição
+      try { await supabase.auth.signOut() } catch {}
+
       const timeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Tempo esgotado. Verifique sua conexão.')), 15000)
+        setTimeout(() => reject(new Error('Tempo esgotado (30s). Tente novamente — pode ser cold start do servidor.')), 30000)
       )
       const req = supabase.auth.signInWithPassword({ email, password })
       const { error } = await Promise.race([req, timeout])
