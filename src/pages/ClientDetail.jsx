@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
+import { usePermission } from '../hooks/usePermission'
 import TaskItem from '../components/ui/TaskItem'
 import TaskTag from '../components/ui/TaskTag'
 import NoteCard from '../components/ui/NoteCard'
@@ -20,10 +21,13 @@ function clientSlug(name) {
 export default function ClientDetail({ onNewTask, onEditTask, onEditClient }) {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { clients, tasks, toggleTask, deleteTask, notes, addNote, archiveClient } = useApp()
+  const { clients, allClients, tasks, toggleTask, deleteTask, notes, addNote, archiveNote, archiveClient, toggleClientHidden } = useApp()
+  const { canEdit, canDelete, canArchive, canSeeHidden } = usePermission()
   const [noteText, setNoteText] = useState('')
 
-  const client = clients.find(c => clientSlug(c.name) === id || String(c.id) === id)
+  // Admin pode ver clientes ocultos ou arquivados diretamente pela URL
+  const clientPool = canSeeHidden ? allClients : clients
+  const client = clientPool.find(c => clientSlug(c.name) === id || String(c.id) === id)
 
   if (!client) {
     return (
@@ -69,11 +73,23 @@ export default function ClientDetail({ onNewTask, onEditTask, onEditClient }) {
             {client.tags.length > 0 && ' · ' + client.tags.join(' + ')}
           </p>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button className="btn btn-ghost" onClick={() => navigate(`/relatorio/${id}`)}>📄 Relatório</button>
-          <button className="btn btn-ghost" onClick={() => onEditClient(client)}>✏️ Editar</button>
-          <button className="btn btn-ghost" style={{ color: 'var(--red)' }} onClick={handleArchive}>Arquivar</button>
-          <button className="btn btn-primary" onClick={onNewTask}>+ Tarefa</button>
+          {canEdit && <button className="btn btn-ghost" onClick={() => onEditClient(client)}>✏️ Editar</button>}
+          {canArchive && (
+            <>
+              <button
+                className="btn btn-ghost"
+                style={{ fontSize: '12px' }}
+                title={client.hidden ? 'Tornar visível' : 'Ocultar (só admin)'}
+                onClick={() => toggleClientHidden(client.id)}
+              >
+                {client.hidden ? '👁 Visível' : '🔒 Ocultar'}
+              </button>
+              <button className="btn btn-ghost" style={{ color: 'var(--red)' }} onClick={handleArchive}>📦 Arquivar</button>
+            </>
+          )}
+          {canEdit && <button className="btn btn-primary" onClick={onNewTask}>+ Tarefa</button>}
         </div>
       </div>
 

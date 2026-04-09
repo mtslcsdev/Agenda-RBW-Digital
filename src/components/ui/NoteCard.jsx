@@ -8,7 +8,7 @@ function formatDate(iso) {
 
 const COLOR_CLASS = { yellow: '', blue: 'blue', purple: 'purple' }
 
-export default function NoteCard({ note, onEdit, onDelete, showActions = true, preview = false }) {
+export default function NoteCard({ note, onEdit, onDelete, onArchive, showActions = true, preview = false, archivedMode = false }) {
   const { toggleNoteItem, pinNote } = useApp()
   const colorClass = COLOR_CLASS[note.color] || ''
   const isPinned = note.pinned
@@ -50,7 +50,17 @@ export default function NoteCard({ note, onEdit, onDelete, showActions = true, p
                 ✏️
               </button>
             )}
-            {onDelete && (
+            {onArchive && (
+              <button
+                className="btn-icon"
+                style={{ width: '20px', height: '20px', fontSize: '10px' }}
+                onClick={() => onArchive(note.id)}
+                title={archivedMode ? 'Desarquivar' : 'Arquivar'}
+              >
+                {archivedMode ? '↩' : '📦'}
+              </button>
+            )}
+            {onDelete && !archivedMode && (
               <button
                 className="btn-icon"
                 style={{ width: '20px', height: '20px', fontSize: '10px', color: 'var(--red)' }}
