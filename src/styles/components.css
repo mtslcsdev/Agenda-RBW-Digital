@@ -1135,9 +1135,9 @@
   background: none;
   border: 1px solid var(--border);
   border-radius: 8px;
-  width: 34px;
-  height: 34px;
-  font-size: 16px;
+  width: 36px;
+  height: 36px;
+  font-size: 17px;
   cursor: pointer;
   color: var(--text2);
   display: none;
@@ -1159,8 +1159,20 @@
   background: rgba(0, 0, 0, 0.45);
 }
 
-/* ===== RESPONSIVE — MOBILE ===== */
+/* ===== RESPONSIVE — NOTEBOOKS (≤1100px) ===== */
+@media (max-width: 1100px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .three-col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ===== RESPONSIVE — TABLETS / SMALL NOTEBOOKS (≤768px) ===== */
 @media (max-width: 768px) {
+  /* Sidebar vira drawer */
   .sidebar {
     position: fixed;
     left: 0;
@@ -1168,14 +1180,14 @@
     bottom: 0;
     z-index: 200;
     transform: translateX(-100%);
-    transition: transform 0.25s ease, background 0.3s;
+    transition: transform 0.25s ease;
     height: 100dvh;
     overflow-y: auto;
   }
 
   .sidebar.open {
     transform: translateX(0);
-    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.2);
+    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.22);
   }
 
   .sidebar-overlay {
@@ -1186,8 +1198,43 @@
     display: flex;
   }
 
+  /* Topbar */
+  .topbar {
+    padding: 0 14px;
+    gap: 8px;
+    height: 56px;
+  }
+
+  .topbar h2 {
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+  }
+
+  .topbar-username {
+    display: none;
+  }
+
+  .search-bar {
+    max-width: 200px;
+    padding: 7px 10px;
+  }
+
+  .search-bar input {
+    font-size: 13px;
+  }
+
+  /* Content */
+  .content {
+    padding: 14px !important;
+  }
+
+  /* Grids */
   .stats-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
   }
 
   .two-col {
@@ -1198,44 +1245,214 @@
     grid-template-columns: 1fr !important;
   }
 
-  .content {
-    padding: 16px !important;
+  /* Formulários */
+  .form-row {
+    grid-template-columns: 1fr !important;
+    gap: 0;
   }
 
-  .topbar {
-    padding: 0 16px;
-    gap: 10px;
+  /* Modal */
+  .modal {
+    width: calc(100vw - 28px) !important;
+    max-width: 100% !important;
+    padding: 20px 16px;
+    margin: 0 14px;
+    border-radius: 14px;
   }
 
-  .topbar h2 {
-    font-size: 14px;
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
   }
 
+  .modal-overlay .modal {
+    width: 100% !important;
+    margin: 0;
+    border-radius: 18px 18px 0 0;
+    max-height: 92dvh;
+    overflow-y: auto;
+  }
+
+  /* Kanban */
   .kanban-board {
     overflow-x: auto;
+    padding-bottom: 12px;
+    -webkit-overflow-scrolling: touch;
   }
 
   .kanban-col {
-    min-width: 260px;
-    max-width: 280px;
+    min-width: 270px;
+    max-width: 290px;
+  }
+
+  /* Agenda */
+  .week-grid {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 4px;
+    padding-bottom: 4px;
+  }
+
+  .week-grid > * {
+    min-width: 100px;
+  }
+
+  /* Abas */
+  .tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    max-width: 100%;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+
+  .tabs::-webkit-scrollbar { display: none; }
+
+  /* Cliente rows */
+  .page-clients .client-row {
+    padding: 12px 14px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .page-clients .client-row .detail {
+    display: none;
+  }
+
+  /* Stat card */
+  .stat-card {
+    padding: 14px;
+  }
+
+  .stat-card .value {
+    font-size: 24px;
+  }
+
+  /* Dropdown de busca */
+  .search-dropdown {
+    left: auto;
+    right: 0;
+    width: calc(100vw - 28px);
+  }
+
+  /* Notificações e user dropdown */
+  .notif-dropdown,
+  .user-dropdown {
+    right: 0;
+    left: auto;
+    min-width: min(280px, calc(100vw - 20px));
   }
 }
 
+/* ===== RESPONSIVE — CELULAR (≤480px) ===== */
 @media (max-width: 480px) {
+  /* Topbar */
+  .topbar {
+    padding: 0 12px;
+    gap: 6px;
+    height: 52px;
+  }
+
+  .topbar h2 {
+    display: none;
+  }
+
+  /* Esconde search bar — usa só busca por dropdown */
+  .search-bar {
+    max-width: 150px;
+    padding: 6px 8px;
+  }
+
+  /* Grids */
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .content {
+    padding: 12px !important;
+  }
+
+  /* Botão primário menor */
+  .topbar .btn-primary,
+  .topbar .btn {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+
+  /* Modal */
+  .modal {
+    padding: 18px 14px;
+  }
+
+  .modal h3 {
+    font-size: 14px;
+  }
+
+  /* Nav-item menor */
+  .nav-item {
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+
+  .nav-item .icon {
+    font-size: 15px;
+  }
+
+  /* Kanban colunas */
+  .kanban-col {
+    min-width: 240px;
+    max-width: 260px;
+  }
+
+  /* Task item */
+  .task-text {
+    font-size: 13px;
+  }
+
+  /* Login card */
+  .login-card {
+    padding: 24px 18px;
+    border-radius: 16px;
+  }
+}
+
+/* ===== RESPONSIVE — CELULAR PEQUENO (≤380px) ===== */
+@media (max-width: 380px) {
+  .topbar {
+    padding: 0 10px;
+    gap: 4px;
+  }
+
+  /* Oculta search em telas muito pequenas */
+  .search-bar {
+    display: none;
+  }
+
   .stats-grid {
     grid-template-columns: 1fr;
   }
 
-  .search-bar {
-    max-width: 180px;
+  .content {
+    padding: 10px !important;
   }
 
-  .topbar .btn-primary {
-    font-size: 12px;
-    padding: 6px 10px;
+  .stat-card .value {
+    font-size: 22px;
+  }
+
+  .kanban-col {
+    min-width: 220px;
+  }
+
+  .modal-overlay .modal {
+    padding: 16px 12px;
+    max-height: 95dvh;
   }
 }
 
+/* ===== FORÇAR DESKTOP (≥769px) ===== */
 @media (min-width: 769px) {
   .hamburger {
     display: none !important;

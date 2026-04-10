@@ -120,8 +120,36 @@ body {
   .app {
     overflow: visible;
   }
+
   .main {
     margin-left: 0 !important;
     width: 100%;
+  }
+}
+
+/* ===== GRIDS — NOTEBOOK ===== */
+@media (max-width: 1100px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ===== GRIDS — MOBILE ===== */
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .two-col, .three-col {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 380px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
   }
 }
