@@ -18,12 +18,10 @@ function ChangePasswordModal({ onClose }) {
     if (form.next.length < 6) return setError('Nova senha deve ter mínimo 6 caracteres.')
     if (form.next !== form.confirm) return setError('As senhas não coincidem.')
 
-    // Verifica senha atual
     const users = JSON.parse(localStorage.getItem('rbw_users') || '[]')
     const user = users.find(u => u.id === currentUser?.id)
     if (!user || user.password !== form.current) return setError('Senha atual incorreta.')
 
-    // Atualiza
     const updated = users.map(u => u.id === currentUser.id ? { ...u, password: form.next } : u)
     localStorage.setItem('rbw_users', JSON.stringify(updated))
     setSuccess(true)
@@ -66,6 +64,120 @@ function ChangePasswordModal({ onClose }) {
   )
 }
 
+function AvatarDisplay({ user, size = 32, style = {} }) {
+  const [avatar, setAvatar] = useState(null)
+
+  useEffect(() => {
+    if (user?.id) {
+      const stored = localStorage.getItem(`rbw_avatar_${user.id}`)
+      setAvatar(stored || null)
+    }
+  }, [user?.id])
+
+  const baseStyle = {
+    width: size, height: size, borderRadius: '50%',
+    background: user?.color || 'var(--accent)',
+    color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontWeight: 700, fontSize: Math.floor(size * 0.36) + 'px', flexShrink: 0,
+    overflow: 'hidden', ...style,
+  }
+
+  if (avatar) {
+    return (
+      <div style={baseStyle}>
+        <img src={avatar} alt={user?.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+      </div>
+    )
+  }
+  return <div style={baseStyle}>{user?.initials || '?'}</div>
+}
+
+function SearchDropdown({ query, onClose }) {
+  const { tasks, clients, notes } = useApp()
+  const navigate = useNavigate()
+
+  const q = query.toLowerCase().trim()
+  if (!q || q.length < 2) return null
+
+  const matchedTasks = tasks.filter(t =>
+    t.title.toLowerCase().includes(q) || (t.client || '').toLowerCase().includes(q)
+  ).slice(0, 5)
+
+  const matchedClients = clients.filter(c =>
+    c.name.toLowerCase().includes(q) || (c.segment || '').toLowerCase().includes(q)
+  ).slice(0, 3)
+
+  const matchedNotes = notes.filter(n =>
+    n.title.toLowerCase().includes(q) || (n.content || '').toLowerCase().includes(q)
+  ).slice(0, 3)
+
+  const total = matchedTasks.length + matchedClients.length + matchedNotes.length
+  if (total === 0) {
+    return (
+      <div className="search-dropdown">
+        <div style={{ padding: '16px', textAlign: 'center', fontSize: '13px', color: 'var(--text3)' }}>
+          Nenhum resultado para "{query}"
+        </div>
+      </div>
+    )
+  }
+
+  function go(path) {
+    onClose()
+    navigate(path)
+  }
+
+  return (
+    <div className="search-dropdown">
+      {matchedTasks.length > 0 && (
+        <>
+          <div className="search-dropdown-section">TAREFAS</div>
+          {matchedTasks.map(t => (
+            <div key={t.id} className="search-dropdown-item" onClick={() => go('/tarefas')}>
+              <span style={{ color: t.done ? 'var(--text3)' : 'var(--accent)' }}>{t.done ? '✓' : '○'}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '13px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: t.done ? 'line-through' : 'none', color: t.done ? 'var(--text3)' : 'var(--text)' }}>{t.title}</div>
+                {t.client && <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{t.client}</div>}
+              </div>
+              {t.priority && t.priority !== 'Normal' && (
+                <span style={{ fontSize: '10px', color: t.priority === 'Urgente' ? 'var(--red)' : 'var(--accent2)', fontWeight: 600, flexShrink: 0 }}>{t.priority}</span>
+              )}
+            </div>
+          ))}
+        </>
+      )}
+      {matchedClients.length > 0 && (
+        <>
+          <div className="search-dropdown-section">CLIENTES</div>
+          {matchedClients.map(c => (
+            <div key={c.id} className="search-dropdown-item" onClick={() => go(`/clientes/${c.id}`)}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: 'white', flexShrink: 0 }}>{c.initials}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '13px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
+                {c.segment && <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{c.segment}</div>}
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+      {matchedNotes.length > 0 && (
+        <>
+          <div className="search-dropdown-section">NOTAS</div>
+          {matchedNotes.map(n => (
+            <div key={n.id} className="search-dropdown-item" onClick={() => go('/notas')}>
+              <span>📝</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '13px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title}</div>
+                {n.project && <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{n.project}</div>}
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function Topbar({ title, onNew, newLabel = '+ Novo', onMenuToggle }) {
   const { searchQuery, setSearchQuery } = useApp()
   const { currentUser, effectiveUser, viewingAs, stopViewingAs, logout } = useAuth()
@@ -73,10 +185,17 @@ export default function Topbar({ title, onNew, newLabel = '+ Novo', onMenuToggle
   const navigate = useNavigate()
   const [userOpen, setUserOpen] = useState(false)
   const [pwdOpen, setPwdOpen] = useState(false)
+  const [searchFocused, setSearchFocused] = useState(false)
   const dropRef = useRef()
+  const searchRef = useRef()
+  const fileRef = useRef()
+  const [, forceUpdate] = useState(0)
 
   useEffect(() => {
-    function handler(e) { if (dropRef.current && !dropRef.current.contains(e.target)) setUserOpen(false) }
+    function handler(e) {
+      if (dropRef.current && !dropRef.current.contains(e.target)) setUserOpen(false)
+      if (searchRef.current && !searchRef.current.contains(e.target)) setSearchFocused(false)
+    }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
@@ -85,6 +204,25 @@ export default function Topbar({ title, onNew, newLabel = '+ Novo', onMenuToggle
     stopViewingAs()
     navigate('/admin')
   }
+
+  function handleAvatarUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file || !currentUser?.id) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      localStorage.setItem(`rbw_avatar_${currentUser.id}`, ev.target.result)
+      forceUpdate(n => n + 1)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  function handleRemoveAvatar() {
+    if (!currentUser?.id) return
+    localStorage.removeItem(`rbw_avatar_${currentUser.id}`)
+    forceUpdate(n => n + 1)
+  }
+
+  const hasAvatar = currentUser?.id && !!localStorage.getItem(`rbw_avatar_${currentUser.id}`)
 
   return (
     <div className="topbar-wrapper">
@@ -118,15 +256,24 @@ export default function Topbar({ title, onNew, newLabel = '+ Novo', onMenuToggle
       <button className="hamburger" onClick={onMenuToggle} aria-label="Menu">☰</button>
       {title && <h2>{title}</h2>}
       <div className="topbar-actions">
-        <div className="search-bar">
-          <span style={{ color: 'var(--text3)' }}>🔍</span>
-          <input
-            placeholder="Buscar tarefas, clientes..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: '14px', padding: 0 }}>✕</button>
+
+        {/* Search bar com dropdown */}
+        <div ref={searchRef} style={{ position: 'relative', flex: 1, maxWidth: '320px' }}>
+          <div className="search-bar">
+            <span style={{ color: 'var(--text3)' }}>🔍</span>
+            <input
+              placeholder="Buscar tarefas, clientes..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onKeyDown={e => { if (e.key === 'Escape') { setSearchQuery(''); setSearchFocused(false) } }}
+            />
+            {searchQuery && (
+              <button onClick={() => { setSearchQuery(''); setSearchFocused(false) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: '14px', padding: 0 }}>✕</button>
+            )}
+          </div>
+          {searchFocused && searchQuery.length >= 2 && (
+            <SearchDropdown query={searchQuery} onClose={() => { setSearchQuery(''); setSearchFocused(false) }} />
           )}
         </div>
 
@@ -137,18 +284,14 @@ export default function Topbar({ title, onNew, newLabel = '+ Novo', onMenuToggle
         {effectiveUser && (
           <div className="user-menu" ref={dropRef}>
             <button className="user-menu-trigger" onClick={() => setUserOpen(o => !o)}>
-              <div className="topbar-avatar" style={{ background: effectiveUser.color }}>
-                {effectiveUser.initials}
-              </div>
+              <AvatarDisplay user={effectiveUser} size={32} />
               <span className="topbar-username">{effectiveUser.name}</span>
               <span style={{ fontSize: '10px', color: 'var(--text3)' }}>▾</span>
             </button>
             {userOpen && (
               <div className="user-dropdown">
                 <div className="user-dropdown-header">
-                  <div className="topbar-avatar large" style={{ background: effectiveUser.color }}>
-                    {effectiveUser.initials}
-                  </div>
+                  <AvatarDisplay user={effectiveUser} size={44} />
                   <div>
                     <div style={{ fontWeight: 600, fontSize: '13px' }}>{effectiveUser.name}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{effectiveUser.email}</div>
@@ -162,9 +305,19 @@ export default function Topbar({ title, onNew, newLabel = '+ Novo', onMenuToggle
                 </div>
                 <div className="user-dropdown-divider" />
                 {!isViewingAs && (
-                  <button className="user-dropdown-item" onClick={() => { setUserOpen(false); setPwdOpen(true) }}>
-                    🔑 Alterar Senha
-                  </button>
+                  <>
+                    <button className="user-dropdown-item" onClick={() => fileRef.current?.click()}>
+                      📷 Alterar Foto
+                    </button>
+                    {hasAvatar && (
+                      <button className="user-dropdown-item" style={{ color: 'var(--red)' }} onClick={() => { handleRemoveAvatar(); setUserOpen(false) }}>
+                        🗑 Remover Foto
+                      </button>
+                    )}
+                    <button className="user-dropdown-item" onClick={() => { setUserOpen(false); setPwdOpen(true) }}>
+                      🔑 Alterar Senha
+                    </button>
+                  </>
                 )}
                 <div className="user-dropdown-divider" />
                 {!isViewingAs && (
@@ -183,6 +336,15 @@ export default function Topbar({ title, onNew, newLabel = '+ Novo', onMenuToggle
         )}
       </div>
     </div>
+
+    {/* Hidden file input for avatar */}
+    <input
+      ref={fileRef}
+      type="file"
+      accept="image/*"
+      style={{ display: 'none' }}
+      onChange={handleAvatarUpload}
+    />
 
     {pwdOpen && <ChangePasswordModal onClose={() => setPwdOpen(false)} />}
     </div>

@@ -2,12 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useApp, CLIENT_COLORS, STATUS_OPTIONS } from '../context/AppContext'
 
 function getInitials(name) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(w => w[0].toUpperCase())
-    .join('')
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
 }
 
 export default function ClientModal({ open, onClose, editingClient = null }) {
@@ -36,20 +31,16 @@ export default function ClientModal({ open, onClose, editingClient = null }) {
     const tagsRaw = fd.get('tags')
     const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : []
     const data = {
-      name,
-      initials: getInitials(name),
+      name, initials: getInitials(name),
       segment: fd.get('segment'),
       email: fd.get('email'),
-      status,
-      statusColor,
-      color,
-      tags,
+      status, statusColor, color, tags,
+      responsible: fd.get('responsible') || '',
+      contract: fd.get('contract') || '',
+      monthlyValue: fd.get('monthlyValue') || '',
     }
-    if (isEdit) {
-      editClient(editingClient.id, data)
-    } else {
-      addClient(data)
-    }
+    if (isEdit) editClient(editingClient.id, data)
+    else addClient(data)
     onClose()
     e.target.reset()
   }
@@ -60,23 +51,26 @@ export default function ClientModal({ open, onClose, editingClient = null }) {
       className={`modal-overlay${open ? ' open' : ''}`}
       onClick={e => e.target === overlayRef.current && onClose()}
     >
-      <div className="modal">
+      <div className="modal" style={{ maxWidth: '520px' }}>
         <h3>{isEdit ? 'Editar Cliente' : 'Novo Cliente'}</h3>
         <form onSubmit={handleSubmit}>
           <div className="form-row">
             <div className="form-group">
               <label>NOME</label>
-              <input name="name" placeholder="Ex: Empresa XYZ" required defaultValue={editingClient?.name || ''} key={editingClient?.id ?? 'new-name'} />
+              <input name="name" placeholder="Ex: Empresa XYZ" required
+                defaultValue={editingClient?.name || ''} key={editingClient?.id ?? 'new-name'} />
             </div>
             <div className="form-group">
               <label>SEGMENTO</label>
-              <input name="segment" placeholder="Ex: E-commerce" defaultValue={editingClient?.segment || ''} key={editingClient?.id ?? 'new-seg'} />
+              <input name="segment" placeholder="Ex: E-commerce"
+                defaultValue={editingClient?.segment || ''} key={editingClient?.id ?? 'new-seg'} />
             </div>
           </div>
           <div className="form-row">
             <div className="form-group">
               <label>E-MAIL</label>
-              <input name="email" type="email" placeholder="contato@empresa.com" defaultValue={editingClient?.email || ''} key={editingClient?.id ?? 'new-email'} />
+              <input name="email" type="email" placeholder="contato@empresa.com"
+                defaultValue={editingClient?.email || ''} key={editingClient?.id ?? 'new-email'} />
             </div>
             <div className="form-group">
               <label>STATUS</label>
@@ -85,23 +79,40 @@ export default function ClientModal({ open, onClose, editingClient = null }) {
               </select>
             </div>
           </div>
+
+          {/* Campos customizáveis */}
+          <div className="form-row">
+            <div className="form-group">
+              <label>RESPONSÁVEL</label>
+              <input name="responsible" placeholder="Ex: Mateus Lucas"
+                defaultValue={editingClient?.responsible || ''} key={editingClient?.id ?? 'new-resp'} />
+            </div>
+            <div className="form-group">
+              <label>VALOR MENSAL</label>
+              <input name="monthlyValue" placeholder="Ex: R$ 2.500"
+                defaultValue={editingClient?.monthlyValue || ''} key={editingClient?.id ?? 'new-val'} />
+            </div>
+          </div>
+          <div className="form-group">
+            <label>CONTRATO / OBSERVAÇÃO</label>
+            <input name="contract" placeholder="Ex: Contrato anual, vence em Dez/2025"
+              defaultValue={editingClient?.contract || ''} key={editingClient?.id ?? 'new-contract'} />
+          </div>
+
           <div className="form-group">
             <label>TAGS (separadas por vírgula)</label>
-            <input name="tags" placeholder="Ex: GHL, N8N, Asaas" defaultValue={editingClient?.tags?.join(', ') || ''} key={editingClient?.id ?? 'new-tags'} />
+            <input name="tags" placeholder="Ex: GHL, N8N, Asaas"
+              defaultValue={editingClient?.tags?.join(', ') || ''} key={editingClient?.id ?? 'new-tags'} />
           </div>
           <div className="form-group">
             <label>COR DO AVATAR</label>
             <div style={{ display: 'flex', gap: '8px' }}>
               {CLIENT_COLORS.map(c => (
-                <div
-                  key={c}
-                  onClick={() => setColor(c)}
-                  style={{
-                    width: '28px', height: '28px', borderRadius: '8px',
-                    background: c, cursor: 'pointer',
-                    border: color === c ? '3px solid var(--text)' : '3px solid transparent',
-                  }}
-                />
+                <div key={c} onClick={() => setColor(c)} style={{
+                  width: '28px', height: '28px', borderRadius: '8px',
+                  background: c, cursor: 'pointer',
+                  border: color === c ? '3px solid var(--text)' : '3px solid transparent',
+                }} />
               ))}
             </div>
           </div>

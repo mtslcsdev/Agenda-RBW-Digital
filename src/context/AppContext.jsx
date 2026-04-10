@@ -35,6 +35,7 @@ const mapTask = r => ({
   notes: r.notes || '', done: r.done || false,
   taskStatus: r.task_status || 'pendente',
   archived: r.archived || false,
+  assigneeName: r.assignee_name || '',
 })
 const mapClient = r => ({
   id: r.id, initials: r.initials || '', name: r.name,
@@ -42,6 +43,9 @@ const mapClient = r => ({
   status: r.status || 'Ativo', statusColor: r.status_color || 'green',
   tags: r.tags || [], color: r.color || '#2D6A4F',
   archived: r.archived || false, hidden: r.hidden || false,
+  responsible: r.responsible || '',
+  contract: r.contract || '',
+  monthlyValue: r.monthly_value || '',
 })
 const mapNote = r => ({
   id: r.id, title: r.title, content: r.content || '',
@@ -75,12 +79,16 @@ const taskRow = t => ({
   tag_color: t.tagColor || 'green', priority: t.priority || 'Normal',
   date: t.date || '', notes: t.notes || '', done: t.done || false,
   task_status: t.taskStatus || 'pendente',
+  assignee_name: t.assigneeName || '',
 })
 const clientRow = c => ({
   initials: c.initials || '', name: c.name, segment: c.segment || '',
   email: c.email || '', status: c.status || 'Ativo',
   status_color: c.statusColor || 'green', tags: c.tags || [],
   color: c.color || '#2D6A4F', archived: c.archived || false,
+  responsible: c.responsible || '',
+  contract: c.contract || '',
+  monthly_value: c.monthlyValue || '',
 })
 const noteRow = n => ({
   title: n.title, content: n.content || '', project: n.project || '',
@@ -129,7 +137,16 @@ export function AppProvider({ children }) {
       if (tRes.data) setTasksState(tRes.data.map(mapTask))
       if (cRes.data) setClientsState(cRes.data.map(mapClient))
       if (nRes.data) setNotesState(nRes.data.map(mapNote))
-      setAppLoading(false) // mostra o app sem esperar dados secundários
+      setAppLoading(false)
+
+      // Notificações de prazo
+      const today = new Date().toISOString().slice(0, 10)
+      const dueTodayTasks = tRes.data?.filter(t => t.date === today && !t.done) || []
+      const overdueTasks  = tRes.data?.filter(t => t.date && t.date < today && !t.done) || []
+      if (overdueTasks.length > 0)
+        setNotifications(prev => [{ id: Date.now(), icon: '⚠️', read: false, message: `${overdueTasks.length} tarefa${overdueTasks.length > 1 ? 's' : ''} em atraso!`, type: 'overdue', createdAt: new Date().toISOString() }, ...prev])
+      if (dueTodayTasks.length > 0)
+        setNotifications(prev => [{ id: Date.now() + 1, icon: '📅', read: false, message: `${dueTodayTasks.length} tarefa${dueTodayTasks.length > 1 ? 's' : ''} vencem hoje!`, type: 'deadline', createdAt: new Date().toISOString() }, ...prev])
 
       // Fase 2 — dados secundários (background)
       const [cmRes, aRes, eRes] = await Promise.all([
@@ -165,30 +182,25 @@ export function AppProvider({ children }) {
 
   function toggleTheme() { setTheme(t => t === 'light' ? 'dark' : 'light') }
 
-  // ── INTERNAL HELPERS ──
-  const _notify = useCallback(async (icon, message, type = 'info') => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data } = await supabase.from('notifications')
-      .insert({ user_id: user.id, icon, message, type, read: false })
-      .select().single()
-    if (data) setNotifications(prev => [mapNotification(data), ...prev].slice(0, 30))
-  }, [])
-
-  const _log = useCallback(async (actor, action, entityType, entityTitle) => {
-    const local = {
-      id: -Date.now(), userName: actor?.name || 'Sistema',
-      userColor: actor?.color || '#6B6960', action, entityType, entityTitle,
+  // ── INTERNAL HELPERS (local — sem Supabase Auth) ──
+  const _notify = useCallback((icon, message, type = 'info') => {
+    const notif = {
+      id: Date.now() + Math.random(),
+      icon, message, type, read: false,
       createdAt: new Date().toISOString(),
     }
-    setActivityLog(prev => [local, ...prev].slice(0, 50))
-    if (actor?.id) {
-      const { data } = await supabase.from('activity_log').insert({
-        user_id: actor.id, user_name: actor.name, user_color: actor.color,
-        action, entity_type: entityType, entity_title: entityTitle,
-      }).select().single()
-      if (data) setActivityLog(prev => prev.map(e => e.id === local.id ? mapActivity(data) : e))
+    setNotifications(prev => [notif, ...prev].slice(0, 30))
+  }, [])
+
+  const _log = useCallback((actor, action, entityType, entityTitle) => {
+    const entry = {
+      id: Date.now() + Math.random(),
+      userName: actor?.name || 'Sistema',
+      userColor: actor?.color || '#6B6960',
+      action, entityType, entityTitle,
+      createdAt: new Date().toISOString(),
     }
+    setActivityLog(prev => [entry, ...prev].slice(0, 50))
   }, [])
 
   // ── TASKS ──
@@ -349,12 +361,9 @@ export function AppProvider({ children }) {
   // ── NOTIFICATIONS ──
   async function markNotificationRead(id) {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
-    await supabase.from('notifications').update({ read: true }).eq('id', id)
   }
   async function markAllRead() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) await supabase.from('notifications').update({ read: true }).eq('user_id', user.id)
   }
 
   // ── TIME TRACKING ──
