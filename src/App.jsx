@@ -8,29 +8,28 @@ import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
 import TaskModal from './components/TaskModal'
 import ClientModal from './components/ClientModal'
-import NoteModal from './components/NoteModal'
 import Dashboard from './pages/Dashboard'
 import Agenda from './pages/Agenda'
 import Tarefas from './pages/Tarefas'
 import Clientes from './pages/Clientes'
 import ClientDetail from './pages/ClientDetail'
-import Notas from './pages/Notas'
 import AdminUsuarios from './pages/AdminUsuarios'
 import Relatorio from './pages/Relatorio'
+import Docs from './pages/Docs'
+import DocEditor from './pages/DocEditor'
 
 const PAGE_TITLES = {
   '/': 'Dashboard',
   '/agenda': 'Agenda',
   '/tarefas': 'Tarefas',
   '/clientes': 'Clientes',
-  '/notas': 'Notas & Documentos',
+  '/docs': 'Documentos',
   '/admin': 'Usuários & Permissões',
 }
 
 const NEW_LABELS = {
   '/tarefas': '+ Tarefa',
   '/clientes': '+ Cliente',
-  '/notas': '+ Nota',
 }
 
 function LoadingScreen() {
@@ -70,7 +69,6 @@ function AppLayout() {
   const [editingTask, setEditingTask] = useState(null)
   const [clientOpen, setClientOpen] = useState(false)
   const [editingClient, setEditingClient] = useState(null)
-  const [noteOpen, setNoteOpen] = useState(false)
 
   if (appLoading) return <LoadingScreen />
 
@@ -78,27 +76,27 @@ function AppLayout() {
   function openEditTask(task) { setEditingTask(task); setTaskOpen(true) }
   function openNewClient() { setEditingClient(null); setClientOpen(true) }
   function openEditClient(client) { setEditingClient(client); setClientOpen(true) }
-  function openNewNote() { setNoteOpen(true) }
 
   function handleTopbarNew() {
     if (pathname === '/clientes' || pathname.startsWith('/clientes/')) openNewClient()
-    else if (pathname === '/notas') openNewNote()
     else if (pathname === '/admin') return
+    else if (pathname.startsWith('/docs')) return
     else openNewTask()
   }
 
   const isClientDetail = pathname.startsWith('/clientes/') && pathname !== '/clientes'
   const isRelatorio = pathname.startsWith('/relatorio')
+  const isDocEditor = pathname.startsWith('/docs/') && pathname !== '/docs'
   const isAdmin = pathname === '/admin'
-  const pageTitle = isClientDetail ? undefined : (PAGE_TITLES[pathname] || 'RBW Digital')
+  const pageTitle = isClientDetail || isDocEditor ? undefined : (PAGE_TITLES[pathname] || 'RBW Digital')
   const newLabel = NEW_LABELS[pathname] || (pathname.startsWith('/clientes/') ? '+ Tarefa' : '+ Novo')
-  const hideNewBtn = isAdmin || isRelatorio || !canEdit
+  const hideNewBtn = isAdmin || isRelatorio || isDocEditor || !canEdit
 
   return (
     <div className="app">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="main">
-        {!isRelatorio && (
+        {!isRelatorio && !isDocEditor && (
           <Topbar
             title={isClientDetail ? '' : pageTitle}
             onNew={hideNewBtn ? undefined : (isClientDetail ? openNewTask : handleTopbarNew)}
@@ -106,14 +104,15 @@ function AppLayout() {
             onMenuToggle={() => setSidebarOpen(o => !o)}
           />
         )}
-        <div className="content">
+        <div className={`content${isDocEditor ? ' content-doc' : ''}`}>
           <Routes>
             <Route path="/" element={<Dashboard onNewTask={openNewTask} onEditTask={openEditTask} />} />
             <Route path="/agenda" element={<Agenda />} />
             <Route path="/tarefas" element={<Tarefas onNew={openNewTask} onEdit={openEditTask} />} />
             <Route path="/clientes" element={<Clientes onNew={openNewClient} onEdit={openEditClient} />} />
             <Route path="/clientes/:id" element={<ClientDetail onNewTask={openNewTask} onEditTask={openEditTask} onEditClient={openEditClient} />} />
-            <Route path="/notas" element={<Notas onNew={openNewNote} />} />
+            <Route path="/docs" element={<Docs />} />
+            <Route path="/docs/:id" element={<DocEditor />} />
             <Route path="/admin" element={<AdminUsuarios />} />
             <Route path="/relatorio/:clientId" element={<Relatorio />} />
           </Routes>
@@ -122,7 +121,6 @@ function AppLayout() {
 
       <TaskModal open={taskOpen} onClose={() => { setTaskOpen(false); setEditingTask(null) }} editingTask={editingTask} />
       <ClientModal open={clientOpen} onClose={() => { setClientOpen(false); setEditingClient(null) }} editingClient={editingClient} />
-      <NoteModal open={noteOpen} onClose={() => setNoteOpen(false)} />
     </div>
   )
 }

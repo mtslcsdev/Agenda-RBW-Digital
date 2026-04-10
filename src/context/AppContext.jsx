@@ -72,6 +72,18 @@ const mapTimeEntry = r => ({
   id: r.id, taskId: r.task_id, startTime: r.start_time,
   endTime: r.end_time, duration: r.duration || 0,
 })
+const mapFolder = r => ({
+  id: r.id, name: r.name, clientId: r.client_id || null,
+  color: r.color || '#2D6A4F', createdAt: r.created_at,
+})
+const mapDoc = r => ({
+  id: r.id, title: r.title || 'Sem título', content: r.content || '',
+  folderId: r.folder_id || null, clientId: r.client_id || null,
+  linkedTaskIds: r.linked_task_ids || [],
+  authorId: r.author_id || '', authorName: r.author_name || '',
+  authorColor: r.author_color || '',
+  createdAt: r.created_at, updatedAt: r.updated_at,
+})
 
 // ── Mapeamento App → DB ──────────────────────────────────────
 const taskRow = t => ({
@@ -105,6 +117,8 @@ export function AppProvider({ children }) {
   const [notifications, setNotifications] = useState([])
   const [activityLog, setActivityLog]  = useState([])
   const [timeEntries, setTimeEntries]  = useState([])
+  const [docs, setDocsState]           = useState([])
+  const [folders, setFoldersState]     = useState([])
   const [activeTimer, setActiveTimer]  = useState(() => {
     try { return JSON.parse(localStorage.getItem('fd_activeTimer')) } catch { return null }
   })
@@ -164,6 +178,14 @@ export function AppProvider({ children }) {
       }
       if (aRes.data) setActivityLog(aRes.data.map(mapActivity))
       if (eRes.data) setTimeEntries(eRes.data.map(mapTimeEntry))
+
+      // Fase 3 — docs e pastas
+      const [fRes, dRes] = await Promise.all([
+        supabase.from('folders').select('*').order('created_at', { ascending: true }),
+        supabase.from('docs').select('*').order('updated_at', { ascending: false }),
+      ])
+      if (fRes.data) setFoldersState(fRes.data.map(mapFolder))
+      if (dRes.data) setDocsState(dRes.data.map(mapDoc))
 
       try {
         const { data: { user } } = await supabase.auth.getUser()
@@ -396,6 +418,61 @@ export function AppProvider({ children }) {
     return total + current
   }
 
+  // ── FOLDERS ──
+  async function addFolder(data) {
+    const tmp = { id: 'tmp-' + Date.now(), name: data.name, color: data.color || '#2D6A4F', clientId: data.clientId || null, createdAt: new Date().toISOString() }
+    setFoldersState(prev => [...prev, tmp])
+    const { data: row } = await supabase.from('folders').insert({
+      name: data.name, color: data.color || '#2D6A4F', client_id: data.clientId || null,
+    }).select().single()
+    if (row) setFoldersState(prev => prev.map(f => f.id === tmp.id ? mapFolder(row) : f))
+    return row ? mapFolder(row) : tmp
+  }
+
+  async function deleteFolder(id) {
+    setFoldersState(prev => prev.filter(f => f.id !== id))
+    setDocsState(prev => prev.map(d => d.folderId === id ? { ...d, folderId: null } : d))
+    await supabase.from('folders').delete().eq('id', id)
+    await supabase.from('docs').update({ folder_id: null }).eq('folder_id', id)
+  }
+
+  // ── DOCS ──
+  async function addDoc(data) {
+    const tmp = { ...data, id: 'tmp-' + Date.now(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+    setDocsState(prev => [tmp, ...prev])
+    const { data: row } = await supabase.from('docs').insert({
+      title: data.title || 'Sem título',
+      content: data.content || '',
+      folder_id: data.folderId || null,
+      client_id: data.clientId || null,
+      linked_task_ids: data.linkedTaskIds || [],
+      author_id: data.authorId || '',
+      author_name: data.authorName || '',
+      author_color: data.authorColor || '',
+    }).select().single()
+    if (row) {
+      setDocsState(prev => prev.map(d => d.id === tmp.id ? mapDoc(row) : d))
+      return mapDoc(row)
+    }
+    return tmp
+  }
+
+  async function editDoc(id, data) {
+    const now = new Date().toISOString()
+    setDocsState(prev => prev.map(d => d.id === id ? { ...d, ...data, updatedAt: now } : d))
+    await supabase.from('docs').update({
+      title: data.title,
+      content: data.content,
+      linked_task_ids: data.linkedTaskIds,
+      updated_at: now,
+    }).eq('id', id)
+  }
+
+  async function deleteDoc(id) {
+    setDocsState(prev => prev.filter(d => d.id !== id))
+    await supabase.from('docs').delete().eq('id', id)
+  }
+
   const activeClients   = clients.filter(c => !c.archived && !c.hidden)
   const hiddenClients   = clients.filter(c => c.hidden && !c.archived)
   const archivedClients = clients.filter(c => c.archived)
@@ -419,6 +496,7 @@ export function AppProvider({ children }) {
       notifications, markNotificationRead, markAllRead, unreadCount,
       activityLog,
       timeEntries, activeTimer, startTimer, stopTimer, getTaskTotalTime,
+      docs, folders, addDoc, editDoc, deleteDoc, addFolder, deleteFolder,
       searchQuery, setSearchQuery,
     }}>
       {children}

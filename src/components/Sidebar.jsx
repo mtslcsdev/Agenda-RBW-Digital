@@ -2,13 +2,12 @@ import { NavLink } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { useAuth, ROLES } from '../context/AuthContext'
 import { usePermission } from '../hooks/usePermission'
-import { clientSlug } from '../pages/ClientDetail'
 import rbwLogo from '../assets/rbw-logo.svg'
 
 export default function Sidebar({ open, onClose }) {
-  const { theme, toggleTheme, clients, hiddenClients, tasks } = useApp()
+  const { theme, toggleTheme, tasks, docs } = useApp()
   const { currentUser, effectiveUser } = useAuth()
-  const { isAdmin, isActualAdmin, canSeeHidden } = usePermission()
+  const { isActualAdmin } = usePermission()
   const today = new Date().toISOString().slice(0, 10)
   const overdueCount = tasks.filter(t => t.date < today && !t.done).length
   const todayCount = tasks.filter(t => t.date === today && !t.done).length
@@ -51,30 +50,13 @@ export default function Sidebar({ open, onClose }) {
           <NavLink to="/clientes" end className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} onClick={handleNav}>
             <span className="icon">◉</span> Todos os Clientes
           </NavLink>
-          {clients.map(client => (
-            <NavLink key={client.id} to={`/clientes/${clientSlug(client.name)}`} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} onClick={handleNav}>
-              <span className="icon">▸</span>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.name}</span>
-            </NavLink>
-          ))}
-          {/* Clientes ocultos — só admin real vê */}
-          {canSeeHidden && hiddenClients?.length > 0 && (
-            <>
-              <div className="nav-label" style={{ marginTop: '8px', color: 'var(--accent2)', fontSize: '10px' }}>🔒 Ocultos</div>
-              {hiddenClients.map(client => (
-                <NavLink key={client.id} to={`/clientes/${clientSlug(client.name)}`} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} onClick={handleNav} style={{ opacity: 0.7 }}>
-                  <span className="icon">▸</span>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.name}</span>
-                </NavLink>
-              ))}
-            </>
-          )}
         </nav>
 
         <nav className="nav-section" style={{ marginTop: '8px' }}>
           <div className="nav-label">Organização</div>
-          <NavLink to="/notas" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} onClick={handleNav}>
-            <span className="icon">◻</span> Notas & Docs
+          <NavLink to="/docs" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} onClick={handleNav}>
+            <span className="icon">📄</span> Documentos
+            {docs.length > 0 && <span className="badge" style={{ background: 'rgba(255,255,255,0.15)' }}>{docs.length}</span>}
           </NavLink>
         </nav>
 
