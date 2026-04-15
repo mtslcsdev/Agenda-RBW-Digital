@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AppContext = createContext(null)
@@ -7,35 +7,38 @@ export const TAG_COLORS = {
   GHL: 'green', N8N: 'orange', Vendas: 'purple',
   Reunião: 'yellow', Dev: 'green', Pessoal: 'purple',
 }
-
 export const TAG_OPTIONS = ['GHL', 'N8N', 'Vendas', 'Reunião', 'Dev', 'Pessoal']
 export const CLIENT_COLORS = ['#2D6A4F', '#5B4FCF', '#E07A3A', '#D94F3D', '#E8A923', '#3A7CA5']
 export const PRIORITY_COLORS = { Normal: null, Alta: 'var(--accent2)', Urgente: 'var(--red)' }
-
 export const KANBAN_COLUMNS = [
-  { id: 'pendente',    label: 'Pendente',     color: 'var(--text3)' },
+  { id: 'pendente',     label: 'Pendente',     color: 'var(--text3)' },
   { id: 'em-progresso', label: 'Em Progresso', color: 'var(--accent3)' },
-  { id: 'concluido',  label: 'Concluído',    color: 'var(--accent)' },
+  { id: 'concluido',   label: 'Concluído',    color: 'var(--accent)' },
 ]
-
-const STATUS_OPTIONS = [
+export const STATUS_OPTIONS = [
   { label: 'Em andamento', color: 'orange' },
   { label: 'Ativo',        color: 'green' },
-  { label: 'Onboarding',  color: 'yellow' },
+  { label: 'Onboarding',   color: 'yellow' },
   { label: 'Pausado',      color: 'red' },
-  { label: 'Concluído',   color: 'purple' },
+  { label: 'Concluído',    color: 'purple' },
 ]
-export { STATUS_OPTIONS }
 
-// ── Mapeamento DB → App ──────────────────────────────────────
+// ── Mappers DB → App ──────────────────────────────────────────
 const mapTask = r => ({
-  id: r.id, title: r.title, client: r.client || '',
-  tag: r.tag || '', tagColor: r.tag_color || 'green',
-  priority: r.priority || 'Normal', date: r.date || '',
-  notes: r.notes || '', done: r.done || false,
+  id: r.id,
+  title: r.title,
+  client: r.client || '',         // string legada (manter para compatibilidade)
+  client_id: r.client_id || null, // FK novo
+  tag: r.tag || '',
+  tagColor: r.tag_color || 'green',
+  priority: r.priority || 'Normal',
+  date: r.date || '',
+  notes: r.notes || '',
+  done: r.done || false,
   taskStatus: r.task_status || 'pendente',
   archived: r.archived || false,
   assigneeName: r.assignee_name || '',
+  assignee_id: r.assignee_id || null,
 })
 const mapClient = r => ({
   id: r.id, initials: r.initials || '', name: r.name,
@@ -43,8 +46,7 @@ const mapClient = r => ({
   status: r.status || 'Ativo', statusColor: r.status_color || 'green',
   tags: r.tags || [], color: r.color || '#2D6A4F',
   archived: r.archived || false, hidden: r.hidden || false,
-  responsible: r.responsible || '',
-  contract: r.contract || '',
+  responsible: r.responsible || '', contract: r.contract || '',
   monthlyValue: r.monthly_value || '',
 })
 const mapNote = r => ({
@@ -85,21 +87,21 @@ const mapDoc = r => ({
   createdAt: r.created_at, updatedAt: r.updated_at,
 })
 
-// ── Mapeamento App → DB ──────────────────────────────────────
+// ── Mappers App → DB ──────────────────────────────────────────
 const taskRow = t => ({
-  title: t.title, client: t.client || '', tag: t.tag || '',
-  tag_color: t.tagColor || 'green', priority: t.priority || 'Normal',
-  date: t.date || '', notes: t.notes || '', done: t.done || false,
+  title: t.title, client: t.client || '', client_id: t.client_id || null,
+  tag: t.tag || '', tag_color: t.tagColor || 'green',
+  priority: t.priority || 'Normal', date: t.date || '',
+  notes: t.notes || '', done: t.done || false,
   task_status: t.taskStatus || 'pendente',
-  assignee_name: t.assigneeName || '',
+  assignee_name: t.assigneeName || '', assignee_id: t.assignee_id || null,
 })
 const clientRow = c => ({
   initials: c.initials || '', name: c.name, segment: c.segment || '',
   email: c.email || '', status: c.status || 'Ativo',
   status_color: c.statusColor || 'green', tags: c.tags || [],
   color: c.color || '#2D6A4F', archived: c.archived || false,
-  responsible: c.responsible || '',
-  contract: c.contract || '',
+  responsible: c.responsible || '', contract: c.contract || '',
   monthly_value: c.monthlyValue || '',
 })
 const noteRow = n => ({
@@ -109,21 +111,22 @@ const noteRow = n => ({
 })
 
 export function AppProvider({ children }) {
-  const [appLoading, setAppLoading] = useState(true)
-  const [tasks, setTasksState]         = useState([])
-  const [clients, setClientsState]     = useState([])
-  const [notes, setNotesState]         = useState([])
-  const [comments, setCommentsState]   = useState({})
+  const [appLoading, setAppLoading]       = useState(true)
+  const [tasks, setTasksState]            = useState([])
+  const [clients, setClientsState]        = useState([])
+  const [notes, setNotesState]            = useState([])
+  const [comments, setCommentsState]      = useState({})
   const [notifications, setNotifications] = useState([])
-  const [activityLog, setActivityLog]  = useState([])
-  const [timeEntries, setTimeEntries]  = useState([])
-  const [docs, setDocsState]           = useState([])
-  const [folders, setFoldersState]     = useState([])
-  const [activeTimer, setActiveTimer]  = useState(() => {
+  const [activityLog, setActivityLog]     = useState([])
+  const [timeEntries, setTimeEntries]     = useState([])
+  const [docs, setDocsState]              = useState([])
+  const [folders, setFoldersState]        = useState([])
+  const [activeTimer, setActiveTimer]     = useState(() => {
     try { return JSON.parse(localStorage.getItem('fd_activeTimer')) } catch { return null }
   })
   const [theme, setTheme] = useState(() => localStorage.getItem('fd_theme') || 'light')
-  const [searchQuery, setSearchQuery]  = useState('')
+  const [searchQuery, setSearchQuery]     = useState('')
+  const realtimeRef = useRef([])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -134,15 +137,20 @@ export function AppProvider({ children }) {
     localStorage.setItem('fd_activeTimer', JSON.stringify(activeTimer))
   }, [activeTimer])
 
+  // ── Carregamento em 3 fases ───────────────────────────────────
   useEffect(() => {
-    // Timeout de segurança: mostra o app em até 7s mesmo que queries travem
     const safetyTimer = setTimeout(() => setAppLoading(false), 7000)
-    loadAll().finally(() => clearTimeout(safetyTimer))
+    loadAll()
+      .finally(() => clearTimeout(safetyTimer))
+      .then(() => setupRealtime())
+    return () => {
+      realtimeRef.current.forEach(ch => supabase.removeChannel(ch))
+    }
   }, [])
 
   async function loadAll() {
     try {
-      // Fase 1 — dados críticos (desbloqueia a UI imediatamente)
+      // Fase 1 — crítica (tasks, clients, notes)
       const [tRes, cRes, nRes] = await Promise.all([
         supabase.from('tasks').select('*').order('created_at', { ascending: false }),
         supabase.from('clients').select('*').order('created_at', { ascending: false }),
@@ -153,16 +161,14 @@ export function AppProvider({ children }) {
       if (nRes.data) setNotesState(nRes.data.map(mapNote))
       setAppLoading(false)
 
-      // Notificações de prazo
+      // Notificações de prazo ao carregar
       const today = new Date().toISOString().slice(0, 10)
-      const dueTodayTasks = tRes.data?.filter(t => t.date === today && !t.done) || []
-      const overdueTasks  = tRes.data?.filter(t => t.date && t.date < today && !t.done) || []
-      if (overdueTasks.length > 0)
-        setNotifications(prev => [{ id: Date.now(), icon: '⚠️', read: false, message: `${overdueTasks.length} tarefa${overdueTasks.length > 1 ? 's' : ''} em atraso!`, type: 'overdue', createdAt: new Date().toISOString() }, ...prev])
-      if (dueTodayTasks.length > 0)
-        setNotifications(prev => [{ id: Date.now() + 1, icon: '📅', read: false, message: `${dueTodayTasks.length} tarefa${dueTodayTasks.length > 1 ? 's' : ''} vencem hoje!`, type: 'deadline', createdAt: new Date().toISOString() }, ...prev])
+      const overdue  = tRes.data?.filter(t => t.date && t.date < today && !t.done) || []
+      const dueToday = tRes.data?.filter(t => t.date === today && !t.done) || []
+      if (overdue.length)   _notify('⚠️', `${overdue.length} tarefa${overdue.length > 1 ? 's' : ''} em atraso!`, 'overdue')
+      if (dueToday.length)  _notify('📅', `${dueToday.length} tarefa${dueToday.length > 1 ? 's' : ''} vencem hoje!`, 'deadline')
 
-      // Fase 2 — dados secundários (background)
+      // Fase 2 — background (comments, activity, time)
       const [cmRes, aRes, eRes] = await Promise.all([
         supabase.from('comments').select('*').order('created_at', { ascending: true }),
         supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(50),
@@ -187,31 +193,75 @@ export function AppProvider({ children }) {
       if (fRes.data) setFoldersState(fRes.data.map(mapFolder))
       if (dRes.data) setDocsState(dRes.data.map(mapDoc))
 
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          const { data: nf } = await supabase.from('notifications')
-            .select('*').eq('user_id', user.id)
-            .order('created_at', { ascending: false }).limit(30)
-          if (nf) setNotifications(nf.map(mapNotification))
-        }
-      } catch {}
     } catch (err) {
-      console.error('Erro ao carregar dados do Supabase:', err)
+      console.error('Erro ao carregar dados:', err)
       setAppLoading(false)
     }
   }
 
+  // ── Realtime Supabase ─────────────────────────────────────────
+  function setupRealtime() {
+    // Tasks — atualiza em tempo real para todos os usuários
+    const tasksCh = supabase
+      .channel('realtime:tasks')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tasks' }, ({ new: row }) => {
+        setTasksState(prev => prev.find(t => t.id === row.id) ? prev : [mapTask(row), ...prev])
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tasks' }, ({ new: row }) => {
+        setTasksState(prev => prev.map(t => t.id === row.id ? mapTask(row) : t))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'tasks' }, ({ old }) => {
+        setTasksState(prev => prev.filter(t => t.id !== old.id))
+      })
+      .subscribe()
+
+    // Comments — realtime para colaboração
+    const commentsCh = supabase
+      .channel('realtime:comments')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments' }, ({ new: row }) => {
+        setCommentsState(prev => ({
+          ...prev,
+          [row.task_id]: [...(prev[row.task_id] || []), mapComment(row)],
+        }))
+        const task = null // não temos tasks aqui facilmente; notificação genérica
+        _notify('💬', 'Novo comentário em uma tarefa', 'comment.added')
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'comments' }, ({ old }) => {
+        setCommentsState(prev => {
+          const updated = { ...prev }
+          Object.keys(updated).forEach(taskId => {
+            updated[taskId] = updated[taskId].filter(c => c.id !== old.id)
+          })
+          return updated
+        })
+      })
+      .subscribe()
+
+    // Clients — atualiza lista de clientes em tempo real
+    const clientsCh = supabase
+      .channel('realtime:clients')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clients' }, ({ new: row }) => {
+        setClientsState(prev => prev.find(c => c.id === row.id) ? prev : [...prev, mapClient(row)])
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'clients' }, ({ new: row }) => {
+        setClientsState(prev => prev.map(c => c.id === row.id ? mapClient(row) : c))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'clients' }, ({ old }) => {
+        setClientsState(prev => prev.filter(c => c.id !== old.id))
+      })
+      .subscribe()
+
+    realtimeRef.current = [tasksCh, commentsCh, clientsCh]
+  }
+
   function toggleTheme() { setTheme(t => t === 'light' ? 'dark' : 'light') }
 
-  // ── INTERNAL HELPERS (local — sem Supabase Auth) ──
+  // ── Helpers internos ──────────────────────────────────────────
   const _notify = useCallback((icon, message, type = 'info') => {
-    const notif = {
-      id: Date.now() + Math.random(),
-      icon, message, type, read: false,
-      createdAt: new Date().toISOString(),
-    }
-    setNotifications(prev => [notif, ...prev].slice(0, 30))
+    setNotifications(prev => [{
+      id: Date.now() + Math.random(), icon, message, type,
+      read: false, createdAt: new Date().toISOString(),
+    }, ...prev].slice(0, 30))
   }, [])
 
   const _log = useCallback((actor, action, entityType, entityTitle) => {
@@ -223,23 +273,30 @@ export function AppProvider({ children }) {
       createdAt: new Date().toISOString(),
     }
     setActivityLog(prev => [entry, ...prev].slice(0, 50))
+    // Persiste no banco de forma assíncrona (best-effort)
+    supabase.from('activity_log').insert({
+      user_id: actor?.id, user_name: actor?.name || 'Sistema',
+      user_color: actor?.color || '#6B6960',
+      action, entity_type: entityType, entity_title: entityTitle,
+    }).then(() => {})
   }, [])
 
-  // ── TASKS ──
+  // ── TASKS ─────────────────────────────────────────────────────
   async function addTask(data, actor) {
-    const tmp = { ...data, id: -Date.now(), done: false, taskStatus: data.taskStatus || 'pendente' }
+    const tmp = { ...data, id: 'tmp-' + Date.now(), done: false, taskStatus: data.taskStatus || 'pendente' }
     setTasksState(prev => [tmp, ...prev])
-    const { data: row } = await supabase.from('tasks').insert({
-      ...taskRow(tmp), created_by: actor?.id
-    }).select().single()
+    const { data: row } = await supabase
+      .from('tasks')
+      .insert({ ...taskRow(tmp), created_by: actor?.id })
+      .select().single()
     if (row) setTasksState(prev => prev.map(t => t.id === tmp.id ? mapTask(row) : t))
-    _notify('✅', `Nova tarefa criada: ${data.title}`, 'task.created')
+    _notify('✅', `Nova tarefa: ${data.title}`, 'task.created')
     if (actor) _log(actor, 'criou a tarefa', 'tarefa', data.title)
   }
 
   async function editTask(id, data, actor) {
     setTasksState(prev => prev.map(t => t.id === id ? { ...t, ...data } : t))
-    await supabase.from('tasks').update(taskRow({ ...data, taskStatus: data.taskStatus })).eq('id', id)
+    await supabase.from('tasks').update(taskRow({ ...data })).eq('id', id)
     if (actor) _log(actor, 'editou a tarefa', 'tarefa', data.title || '')
   }
 
@@ -259,7 +316,7 @@ export function AppProvider({ children }) {
     setTasksState(prev => prev.map(t => t.id === id ? { ...t, done, taskStatus } : t))
     await supabase.from('tasks').update({ done, task_status: taskStatus }).eq('id', id)
     if (actor) {
-      _notify(done ? '🏁' : '↩', done ? `Tarefa concluída: ${task.title}` : `Tarefa reaberta: ${task.title}`, done ? 'task.done' : 'task.reopened')
+      _notify(done ? '🏁' : '↩', done ? `Concluída: ${task.title}` : `Reaberta: ${task.title}`, done ? 'task.done' : 'task.reopened')
       _log(actor, done ? 'concluiu a tarefa' : 'reabriu a tarefa', 'tarefa', task.title)
     }
   }
@@ -270,15 +327,21 @@ export function AppProvider({ children }) {
     setTasksState(prev => prev.map(t => t.id !== id ? t : { ...t, taskStatus: newStatus, done }))
     await supabase.from('tasks').update({ task_status: newStatus, done }).eq('id', id)
     if (actor && task) {
-      const colLabel = KANBAN_COLUMNS.find(c => c.id === newStatus)?.label || newStatus
-      _notify('🔀', `Tarefa movida para ${colLabel}: ${task.title}`, 'task.moved')
-      _log(actor, `moveu para ${colLabel}`, 'tarefa', task.title)
+      const col = KANBAN_COLUMNS.find(c => c.id === newStatus)?.label || newStatus
+      _notify('🔀', `Movida para ${col}: ${task.title}`, 'task.moved')
+      _log(actor, `moveu para ${col}`, 'tarefa', task.title)
     }
   }
 
-  // ── CLIENTS ──
+  async function archiveTask(id) {
+    const archived = !(tasks.find(t => t.id === id)?.archived)
+    setTasksState(prev => prev.map(t => t.id === id ? { ...t, archived } : t))
+    await supabase.from('tasks').update({ archived }).eq('id', id)
+  }
+
+  // ── CLIENTS ───────────────────────────────────────────────────
   async function addClient(data) {
-    const tmp = { ...data, id: -Date.now(), archived: false }
+    const tmp = { ...data, id: 'tmp-' + Date.now(), archived: false }
     setClientsState(prev => [...prev, tmp])
     const { data: row } = await supabase.from('clients').insert(clientRow(tmp)).select().single()
     if (row) setClientsState(prev => prev.map(c => c.id === tmp.id ? mapClient(row) : c))
@@ -290,26 +353,20 @@ export function AppProvider({ children }) {
   }
 
   async function archiveClient(id) {
-    const client = clients.find(c => c.id === id)
-    const archived = !(client?.archived)
+    const archived = !(clients.find(c => c.id === id)?.archived)
     setClientsState(prev => prev.map(c => c.id === id ? { ...c, archived } : c))
     await supabase.from('clients').update({ archived }).eq('id', id)
   }
 
   async function toggleClientHidden(id) {
-    const client = clients.find(c => c.id === id)
-    const hidden = !(client?.hidden)
+    const hidden = !(clients.find(c => c.id === id)?.hidden)
     setClientsState(prev => prev.map(c => c.id === id ? { ...c, hidden } : c))
     await supabase.from('clients').update({ hidden }).eq('id', id)
   }
 
-  // ── NOTES ──
+  // ── NOTES ─────────────────────────────────────────────────────
   async function addNote(data) {
-    const n = {
-      ...data, id: -Date.now(),
-      date: new Date().toISOString().slice(0, 10),
-      type: data.type || 'text', items: data.items || [], pinned: false,
-    }
+    const n = { ...data, id: 'tmp-' + Date.now(), date: new Date().toISOString().slice(0, 10), pinned: false }
     setNotesState(prev => [n, ...prev])
     const { data: row } = await supabase.from('notes').insert(noteRow(n)).select().single()
     if (row) setNotesState(prev => prev.map(x => x.id === n.id ? mapNote(row) : x))
@@ -327,16 +384,9 @@ export function AppProvider({ children }) {
   }
 
   async function archiveNote(id) {
-    const note = notes.find(n => n.id === id)
-    const archived = !(note?.archived)
+    const archived = !(notes.find(n => n.id === id)?.archived)
     setNotesState(prev => prev.map(n => n.id === id ? { ...n, archived } : n))
     await supabase.from('notes').update({ archived }).eq('id', id)
-  }
-
-  async function archiveTask(id) {
-    const archived = !(tasks.find(t => t.id === id)?.archived)
-    setTasksState(prev => prev.map(t => t.id === id ? { ...t, archived } : t))
-    await supabase.from('tasks').update({ archived }).eq('id', id)
   }
 
   async function toggleNoteItem(noteId, itemId) {
@@ -348,27 +398,26 @@ export function AppProvider({ children }) {
   }
 
   async function pinNote(id) {
-    const note = notes.find(n => n.id === id)
-    if (!note) return
-    const pinned = !note.pinned
+    const pinned = !(notes.find(n => n.id === id)?.pinned)
     setNotesState(prev => prev.map(n => n.id === id ? { ...n, pinned } : n))
     await supabase.from('notes').update({ pinned }).eq('id', id)
   }
 
-  // ── COMMENTS ──
+  // ── COMMENTS ──────────────────────────────────────────────────
   async function addComment(taskId, text, actor) {
     if (!actor) return
     const { data: row } = await supabase.from('comments').insert({
       task_id: taskId, user_id: actor.id, user_name: actor.name,
       user_color: actor.color, user_initials: actor.initials, text,
     }).select().single()
+    // Realtime cuida da atualização de state; fallback manual se necessário
     if (row) {
       setCommentsState(prev => ({
         ...prev, [taskId]: [...(prev[taskId] || []), mapComment(row)],
       }))
     }
     const task = tasks.find(t => t.id === taskId)
-    _notify('💬', `Novo comentário em: ${task?.title || 'tarefa'}`, 'comment.added')
+    _notify('💬', `Comentário em: ${task?.title || 'tarefa'}`, 'comment.added')
   }
 
   async function deleteComment(taskId, commentId) {
@@ -380,26 +429,26 @@ export function AppProvider({ children }) {
 
   function getComments(taskId) { return comments[taskId] || [] }
 
-  // ── NOTIFICATIONS ──
-  async function markNotificationRead(id) {
+  // ── NOTIFICATIONS ─────────────────────────────────────────────
+  function markNotificationRead(id) {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
   }
-  async function markAllRead() {
+  function markAllRead() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
   }
 
-  // ── TIME TRACKING ──
+  // ── TIME TRACKING ─────────────────────────────────────────────
   async function startTimer(taskId, actor) {
     if (activeTimer) await stopTimer(actor)
     setActiveTimer({ taskId, startTime: Date.now() })
     const task = tasks.find(t => t.id === taskId)
-    if (actor) _notify('⏱', `Timer iniciado: ${task?.title || 'tarefa'}`, 'timer.start')
+    if (actor) _notify('⏱', `Timer: ${task?.title || 'tarefa'}`, 'timer.start')
   }
 
   async function stopTimer(actor) {
     if (!activeTimer) return
     const duration = Date.now() - activeTimer.startTime
-    const entry = { id: -Date.now(), taskId: activeTimer.taskId, startTime: activeTimer.startTime, endTime: Date.now(), duration }
+    const entry = { id: 'tmp-' + Date.now(), taskId: activeTimer.taskId, startTime: activeTimer.startTime, endTime: Date.now(), duration }
     setTimeEntries(prev => [...prev, entry])
     setActiveTimer(null)
     const task = tasks.find(t => t.id === activeTimer.taskId)
@@ -418,7 +467,7 @@ export function AppProvider({ children }) {
     return total + current
   }
 
-  // ── FOLDERS ──
+  // ── FOLDERS ───────────────────────────────────────────────────
   async function addFolder(data) {
     const tmp = { id: 'tmp-' + Date.now(), name: data.name, color: data.color || '#2D6A4F', clientId: data.clientId || null, createdAt: new Date().toISOString() }
     setFoldersState(prev => [...prev, tmp])
@@ -433,21 +482,17 @@ export function AppProvider({ children }) {
     setFoldersState(prev => prev.filter(f => f.id !== id))
     setDocsState(prev => prev.map(d => d.folderId === id ? { ...d, folderId: null } : d))
     await supabase.from('folders').delete().eq('id', id)
-    await supabase.from('docs').update({ folder_id: null }).eq('folder_id', id)
   }
 
-  // ── DOCS ──
+  // ── DOCS ──────────────────────────────────────────────────────
   async function addDoc(data) {
     const tmp = { ...data, id: 'tmp-' + Date.now(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
     setDocsState(prev => [tmp, ...prev])
     const { data: row } = await supabase.from('docs').insert({
-      title: data.title || 'Sem título',
-      content: data.content || '',
-      folder_id: data.folderId || null,
-      client_id: data.clientId || null,
+      title: data.title || 'Sem título', content: data.content || '',
+      folder_id: data.folderId || null, client_id: data.clientId || null,
       linked_task_ids: data.linkedTaskIds || [],
-      author_id: data.authorId || '',
-      author_name: data.authorName || '',
+      author_id: data.authorId || '', author_name: data.authorName || '',
       author_color: data.authorColor || '',
     }).select().single()
     if (row) {
@@ -461,10 +506,8 @@ export function AppProvider({ children }) {
     const now = new Date().toISOString()
     setDocsState(prev => prev.map(d => d.id === id ? { ...d, ...data, updatedAt: now } : d))
     await supabase.from('docs').update({
-      title: data.title,
-      content: data.content,
-      linked_task_ids: data.linkedTaskIds,
-      updated_at: now,
+      title: data.title, content: data.content,
+      linked_task_ids: data.linkedTaskIds, updated_at: now,
     }).eq('id', id)
   }
 
@@ -473,6 +516,7 @@ export function AppProvider({ children }) {
     await supabase.from('docs').delete().eq('id', id)
   }
 
+  // ── Computed ──────────────────────────────────────────────────
   const activeClients   = clients.filter(c => !c.archived && !c.hidden)
   const hiddenClients   = clients.filter(c => c.hidden && !c.archived)
   const archivedClients = clients.filter(c => c.archived)

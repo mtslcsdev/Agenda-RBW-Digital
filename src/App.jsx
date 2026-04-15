@@ -126,7 +126,9 @@ function AppLayout() {
 }
 
 function AuthGuard({ children }) {
-  const { currentUser } = useAuth()
+  const { currentUser, authLoading } = useAuth()
+  // Aguarda resolução da sessão Supabase antes de redirecionar
+  if (authLoading) return <LoadingScreen />
   if (!currentUser) return <Login />
   return <AppProvider>{children}</AppProvider>
 }

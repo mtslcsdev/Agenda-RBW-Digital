@@ -1,122 +1,96 @@
-import { useRef, useEffect, useState, useCallback } from 'react'
-
-const TOOLS = [
-  { cmd: 'bold',          icon: 'B',   title: 'Negrito',        style: { fontWeight: 700 } },
-  { cmd: 'italic',        icon: 'I',   title: 'Itálico',        style: { fontStyle: 'italic' } },
-  { cmd: 'underline',     icon: 'U',   title: 'Sublinhado',     style: { textDecoration: 'underline' } },
-  { sep: true },
-  { cmd: 'h1',            icon: 'H1',  title: 'Título 1',       block: 'h1' },
-  { cmd: 'h2',            icon: 'H2',  title: 'Título 2',       block: 'h2' },
-  { cmd: 'h3',            icon: 'H3',  title: 'Título 3',       block: 'h3' },
-  { sep: true },
-  { cmd: 'insertUnorderedList',  icon: '≡',  title: 'Lista bullet' },
-  { cmd: 'insertOrderedList',    icon: '1≡', title: 'Lista numerada' },
-  { sep: true },
-  { cmd: 'code',          icon: '</>',  title: 'Bloco de código', block: 'pre' },
-  { cmd: 'quote',         icon: '❝',   title: 'Citação',        block: 'blockquote' },
-  { sep: true },
-  { cmd: 'divider',       icon: '—',   title: 'Divisor' },
-  { cmd: 'createLink',    icon: '🔗',  title: 'Link' },
-]
+import { useEffect, useCallback } from 'react'
+import { useEditor, EditorContent } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Placeholder from '@tiptap/extension-placeholder'
+import Link from '@tiptap/extension-link'
 
 export default function RichEditor({ value, onChange, placeholder = 'Escreva aqui...' }) {
-  const editorRef = useRef(null)
-  const [active, setActive] = useState({})
-  const initialized = useRef(false)
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Placeholder.configure({ placeholder }),
+      Link.configure({ openOnClick: false }),
+    ],
+    content: value,
+    onUpdate: ({ editor }) => onChange(editor.getHTML()),
+  })
 
-  // Mount: set initial content
+  // Sync externo: atualiza o conteúdo quando `value` muda fora do editor
   useEffect(() => {
-    if (editorRef.current && !initialized.current) {
-      editorRef.current.innerHTML = value || ''
-      initialized.current = true
+    if (!editor) return
+    const current = editor.getHTML()
+    if (value !== current) {
+      editor.commands.setContent(value || '')
     }
-  }, [])
+  }, [value, editor])
 
-  // Track active formatting states
-  const updateActive = useCallback(() => {
-    setActive({
-      bold:      document.queryCommandState('bold'),
-      italic:    document.queryCommandState('italic'),
-      underline: document.queryCommandState('underline'),
-    })
-  }, [])
+  const setLink = useCallback(() => {
+    const url = prompt('URL do link:')
+    if (!url) return
+    editor.chain().focus().setLink({ href: url }).run()
+  }, [editor])
 
-  function exec(tool) {
-    editorRef.current?.focus()
-    if (tool.block) {
-      document.execCommand('formatBlock', false, tool.block)
-    } else if (tool.cmd === 'divider') {
-      document.execCommand('insertHTML', false, '<hr/><p><br/></p>')
-    } else if (tool.cmd === 'createLink') {
-      const url = prompt('URL do link:')
-      if (url) document.execCommand('createLink', false, url)
-    } else {
-      document.execCommand(tool.cmd, false, null)
-    }
-    handleChange()
-    updateActive()
-  }
+  if (!editor) return null
 
-  function handleChange() {
-    const html = editorRef.current?.innerHTML || ''
-    onChange(html)
-  }
+  const btn = (label, action, isActive, title, extraStyle) => (
+    <button
+      key={label}
+      className={`rich-tool-btn${isActive ? ' active' : ''}`}
+      title={title || label}
+      onMouseDown={e => { e.preventDefault(); action() }}
+      style={extraStyle}
+    >
+      {label}
+    </button>
+  )
 
-  function handleKeyDown(e) {
-    if (e.key === 'Tab') {
-      e.preventDefault()
-      document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;')
-    }
-    // Enter on heading → back to paragraph
-    if (e.key === 'Enter') {
-      const block = document.queryCommandValue('formatBlock')
-      if (['h1','h2','h3'].includes(block)) {
-        setTimeout(() => {
-          document.execCommand('formatBlock', false, 'p')
-        }, 0)
-      }
-    }
-  }
-
-  const isEmpty = !value || value === '' || value === '<br>'
+  const sep = (key) => <div key={key} className="rich-toolbar-sep" />
 
   return (
     <div className="rich-editor-wrap">
-      {/* Toolbar */}
       <div className="rich-toolbar">
-        {TOOLS.map((tool, i) => {
-          if (tool.sep) return <div key={i} className="rich-toolbar-sep" />
-          return (
-            <button
-              key={tool.cmd}
-              className={`rich-tool-btn${active[tool.cmd] ? ' active' : ''}`}
-              title={tool.title}
-              onMouseDown={e => { e.preventDefault(); exec(tool) }}
-              style={tool.style}
-            >
-              {tool.icon}
-            </button>
-          )
-        })}
+        {btn('B', () => editor.chain().focus().toggleBold().run(),
+          editor.isActive('bold'), 'Negrito', { fontWeight: 700 })}
+
+        {btn('I', () => editor.chain().focus().toggleItalic().run(),
+          editor.isActive('italic'), 'Itálico', { fontStyle: 'italic' })}
+
+        {btn('U', () => editor.chain().focus().toggleStrike().run(),
+          editor.isActive('strike'), 'Tachado', { textDecoration: 'line-through' })}
+
+        {sep('s1')}
+
+        {btn('H1', () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
+          editor.isActive('heading', { level: 1 }), 'Título 1')}
+
+        {btn('H2', () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
+          editor.isActive('heading', { level: 2 }), 'Título 2')}
+
+        {btn('H3', () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
+          editor.isActive('heading', { level: 3 }), 'Título 3')}
+
+        {sep('s2')}
+
+        {btn('≡', () => editor.chain().focus().toggleBulletList().run(),
+          editor.isActive('bulletList'), 'Lista bullet')}
+
+        {btn('1≡', () => editor.chain().focus().toggleOrderedList().run(),
+          editor.isActive('orderedList'), 'Lista numerada')}
+
+        {sep('s3')}
+
+        {btn('❝', () => editor.chain().focus().toggleBlockquote().run(),
+          editor.isActive('blockquote'), 'Citação')}
+
+        {btn('</>', () => editor.chain().focus().toggleCodeBlock().run(),
+          editor.isActive('codeBlock'), 'Bloco de código')}
+
+        {sep('s4')}
+
+        {btn('🔗', setLink, editor.isActive('link'), 'Link')}
       </div>
 
-      {/* Editor */}
-      <div className="rich-editor-area">
-        {isEmpty && (
-          <div className="rich-placeholder">{placeholder}</div>
-        )}
-        <div
-          ref={editorRef}
-          contentEditable
-          suppressContentEditableWarning
-          className="rich-editor-content"
-          onInput={handleChange}
-          onKeyDown={handleKeyDown}
-          onKeyUp={updateActive}
-          onMouseUp={updateActive}
-          onFocus={updateActive}
-        />
-      </div>
+      <EditorContent editor={editor} className="rich-editor-content" />
     </div>
   )
 }

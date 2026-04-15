@@ -6,7 +6,7 @@ import rbwLogo from '../assets/rbw-logo.svg'
 
 export default function Sidebar({ open, onClose }) {
   const { theme, toggleTheme, tasks, docs } = useApp()
-  const { currentUser, effectiveUser } = useAuth()
+  const { effectiveUser } = useAuth()
   const { isActualAdmin } = usePermission()
   const today = new Date().toISOString().slice(0, 10)
   const overdueCount = tasks.filter(t => t.date < today && !t.done).length

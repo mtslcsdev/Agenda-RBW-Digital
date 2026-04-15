@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth, ROLES } from '../context/AuthContext'
 import { usePermission } from '../hooks/usePermission'
@@ -11,25 +11,29 @@ function genPassword() {
 }
 
 export default function AdminUsuarios() {
-  const { users, currentUser, updateUserRole, removeUser, createInvitedUser, startViewingAs, resetUserPassword, renameUser } = useAuth()
-  const { isActualAdmin } = usePermission()
+  const {
+    profile, users, currentUser,
+    fetchAllProfiles, createInvitedUser,
+    updateUserRole, removeUser, renameUser, startViewingAs,
+  } = useAuth()
+  const { isActualAdmin, isSuperAdmin } = usePermission()
   const navigate = useNavigate()
 
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ name: '', username: '', role: 'editor', password: '' })
-  const [showPwd, setShowPwd] = useState(false)
-  const [formError, setFormError] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [showForm, setShowForm]     = useState(false)
+  const [form, setForm]             = useState({ name: '', email: '', role: 'editor', password: '' })
+  const [showPwd, setShowPwd]       = useState(false)
+  const [formError, setFormError]   = useState('')
+  const [saving, setSaving]         = useState(false)
   const [createdUser, setCreatedUser] = useState(null)
   const [confirmRemove, setConfirmRemove] = useState(null)
-  const [resetingPwd, setResetingPwd] = useState(null)
-  const [newPwd, setNewPwd] = useState('')
-  const [pwdError, setPwdError] = useState('')
-  const [pwdSuccess, setPwdSuccess] = useState(null)
   const [editingName, setEditingName] = useState(null)
-  const [newName, setNewName] = useState('')
-  const [nameError, setNameError] = useState('')
+  const [newName, setNewName]       = useState('')
+  const [nameError, setNameError]   = useState('')
   const [nameSuccess, setNameSuccess] = useState(null)
+
+  useEffect(() => {
+    if (isActualAdmin) fetchAllProfiles()
+  }, [isActualAdmin])
 
   if (!isActualAdmin) {
     return (
@@ -40,55 +44,32 @@ export default function AdminUsuarios() {
     )
   }
 
+  // ── Criar usuário ─────────────────────────────────────────────
   async function handleAdd(e) {
     e.preventDefault()
-    if (!form.name.trim())     return setFormError('Nome obrigatório')
-    if (!form.username.trim()) return setFormError('Nome de usuário obrigatório')
-    if (users.find(u => u.email === form.username)) return setFormError('Usuário já cadastrado')
+    if (!form.name.trim())  return setFormError('Nome obrigatório')
+    if (!form.email.trim()) return setFormError('E-mail obrigatório')
     const pwd = form.password.trim() || genPassword()
-    if (pwd.length < 6) return setFormError('Senha deve ter mínimo 6 caracteres')
+    if (pwd.length < 6)     return setFormError('Senha deve ter mínimo 6 caracteres')
 
     setSaving(true)
     setFormError('')
-    const { ok, error } = await createInvitedUser(form.username, pwd, form.name, form.role)
+    const { ok, error } = await createInvitedUser(form.email.trim(), pwd, form.name.trim(), form.role)
     if (!ok) { setFormError(error || 'Erro ao criar usuário'); setSaving(false); return }
 
-    setCreatedUser({ name: form.name, username: form.username, password: pwd, role: form.role })
-    setForm({ name: '', username: '', role: 'editor', password: '' })
+    setCreatedUser({ name: form.name, email: form.email, password: pwd, role: form.role })
+    setForm({ name: '', email: '', role: 'editor', password: '' })
     setShowForm(false)
     setSaving(false)
   }
 
-  function handleViewAs(user) {
-    startViewingAs(user)
-    navigate('/')
-  }
-
-  async function handleResetPwd(userId) {
-    if (newPwd.length < 6) { setPwdError('Mínimo 6 caracteres'); return }
-    setPwdError('')
-    const { ok, error } = await resetUserPassword(userId, newPwd)
-    if (!ok) { setPwdError(error || 'Erro ao redefinir'); return }
-    setPwdSuccess(userId)
-    setTimeout(() => { setPwdSuccess(null); setResetingPwd(null); setNewPwd('') }, 2000)
-  }
-
-  function openResetPwd(userId) {
-    setResetingPwd(userId)
-    setNewPwd('')
-    setPwdError('')
-    setPwdSuccess(null)
-    setConfirmRemove(null)
-    setEditingName(null)
-  }
-
+  // ── Editar nome ───────────────────────────────────────────────
   function openEditName(user) {
     setEditingName(user.id)
     setNewName(user.name)
     setNameError('')
     setNameSuccess(null)
     setConfirmRemove(null)
-    setResetingPwd(null)
   }
 
   async function handleRename(userId) {
@@ -99,6 +80,15 @@ export default function AdminUsuarios() {
     setNameSuccess(userId)
     setTimeout(() => { setNameSuccess(null); setEditingName(null); setNewName('') }, 1500)
   }
+
+  // ── Ver como ──────────────────────────────────────────────────
+  function handleViewAs(user) {
+    startViewingAs(user)
+    navigate('/')
+  }
+
+  // ── Proteção super_admin ──────────────────────────────────────
+  function isSuperAdminUser(user) { return user.role === 'super_admin' }
 
   return (
     <>
@@ -111,6 +101,13 @@ export default function AdminUsuarios() {
         </button>
       </div>
 
+      {/* Aviso sobre criação de usuários */}
+      {showForm && (
+        <div style={{ marginBottom: '12px', padding: '10px 14px', background: 'var(--accent-light)', borderRadius: '8px', fontSize: '12px', color: 'var(--accent)', borderLeft: '3px solid var(--accent)' }}>
+          ℹ️ O usuário receberá um e-mail de confirmação do Supabase. Certifique-se de que o e-mail está correto e que o serviço de e-mail está configurado no painel do Supabase.
+        </div>
+      )}
+
       {/* Credenciais do novo usuário */}
       {createdUser && (
         <div className="card" style={{ marginBottom: '20px', padding: '20px', borderLeft: '3px solid var(--accent)' }}>
@@ -118,18 +115,20 @@ export default function AdminUsuarios() {
             ✅ Usuário criado — compartilhe com {createdUser.name}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
-            <div><span style={{ color: 'var(--text3)', width: '80px', display: 'inline-block' }}>Usuário</span><strong>{createdUser.username}</strong></div>
-            <div><span style={{ color: 'var(--text3)', width: '80px', display: 'inline-block' }}>Senha</span>
+            <div><span style={{ color: 'var(--text3)', width: '80px', display: 'inline-block' }}>E-mail</span><strong>{createdUser.email}</strong></div>
+            <div>
+              <span style={{ color: 'var(--text3)', width: '80px', display: 'inline-block' }}>Senha</span>
               <code style={{ background: 'var(--surface2)', padding: '2px 8px', borderRadius: '4px', fontSize: '13px', fontFamily: 'DM Mono, monospace' }}>
                 {createdUser.password}
               </code>
             </div>
-            <div><span style={{ color: 'var(--text3)', width: '80px', display: 'inline-block' }}>Papel</span>
+            <div>
+              <span style={{ color: 'var(--text3)', width: '80px', display: 'inline-block' }}>Papel</span>
               <span style={{ color: ROLES[createdUser.role]?.color, fontWeight: 600 }}>{ROLES[createdUser.role]?.label}</span>
             </div>
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '10px' }}>
-            O usuário pode alterar a senha após o primeiro acesso em Configurações de conta.
+            O usuário deve confirmar o e-mail antes de fazer login (se confirmação estiver habilitada no Supabase).
           </div>
           <button className="btn btn-ghost" style={{ marginTop: '10px', fontSize: '12px' }} onClick={() => setCreatedUser(null)}>
             OK, já copiei
@@ -148,8 +147,8 @@ export default function AdminUsuarios() {
                 <input placeholder="Ex: João Silva" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
               </div>
               <div className="form-group">
-                <label>USUÁRIO</label>
-                <input placeholder="Ex: joao (sem espaços)" value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value.toLowerCase().replace(/\s+/g, '') }))} required autoCapitalize="none" />
+                <label>E-MAIL</label>
+                <input type="email" placeholder="joao@empresa.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value.toLowerCase().trim() }))} required autoCapitalize="none" />
               </div>
             </div>
             <div className="form-row">
@@ -160,14 +159,13 @@ export default function AdminUsuarios() {
                 </select>
               </div>
               <div className="form-group">
-                <label>SENHA INICIAL <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional — gera automático se vazio)</span></label>
+                <label>SENHA INICIAL <span style={{ color: 'var(--text3)', fontWeight: 400 }}>(opcional)</span></label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type={showPwd ? 'text' : 'password'}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder="Mín. 6 caracteres ou automático"
                     value={form.password}
                     onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                    minLength={form.password ? 6 : 0}
                     style={{ paddingRight: '80px' }}
                   />
                   <div style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: '6px' }}>
@@ -193,34 +191,43 @@ export default function AdminUsuarios() {
       {/* Lista de usuários */}
       <div className="card">
         {users.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text3)', fontSize: '13px' }}>Nenhum usuário</div>
+          <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text3)', fontSize: '13px' }}>
+            Nenhum usuário — carregando...
+          </div>
         )}
-        {users.map((user, i) => (
-          <div
-            key={user.id}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px',
-              borderBottom: i < users.length - 1 ? '1px solid var(--border)' : undefined,
-            }}
-          >
-            <div style={{
-              width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
-              background: user.color || COLORS[i % COLORS.length], color: 'white',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '13px', fontWeight: 700,
-            }}>
-              {user.initials || user.name?.slice(0, 2).toUpperCase()}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {editingName === user.id ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                  {nameSuccess === user.id ? (
+        {users.map((user, i) => {
+          const isOwn   = user.id === profile?.id
+          const isSA    = isSuperAdminUser(user)
+          const canAct  = !isOwn && !isSA   // pode editar/remover
+          const editingThisName = editingName === user.id
+
+          return (
+            <div
+              key={user.id}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', flexWrap: 'wrap',
+                borderBottom: i < users.length - 1 ? '1px solid var(--border)' : undefined,
+              }}
+            >
+              {/* Avatar */}
+              <div style={{
+                width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
+                background: user.color || COLORS[i % COLORS.length], color: 'white',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '13px', fontWeight: 700,
+              }}>
+                {user.initials || user.name?.slice(0, 2).toUpperCase()}
+              </div>
+
+              {/* Nome / editor inline */}
+              <div style={{ flex: 1, minWidth: '120px' }}>
+                {editingThisName ? (
+                  nameSuccess === user.id ? (
                     <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>✅ Nome atualizado</span>
                   ) : (
-                    <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                       <input
-                        type="text"
-                        value={newName}
+                        type="text" value={newName}
                         onChange={e => { setNewName(e.target.value); setNameError('') }}
                         style={{ fontSize: '12px', padding: '4px 8px', width: '140px', border: nameError ? '1px solid var(--red)' : '1px solid var(--border)', borderRadius: '6px', background: 'var(--surface2)', color: 'var(--text1)', fontWeight: 600 }}
                         autoFocus
@@ -229,98 +236,69 @@ export default function AdminUsuarios() {
                       {nameError && <span style={{ fontSize: '10px', color: 'var(--red)' }}>{nameError}</span>}
                       <button className="btn btn-ghost" style={{ fontSize: '11px', padding: '3px 7px' }} onClick={() => setEditingName(null)}>✕</button>
                       <button className="btn btn-primary" style={{ fontSize: '11px', padding: '3px 7px' }} onClick={() => handleRename(user.id)}>Salvar</button>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 600 }}>{user.name}</span>
-                  {user.id === currentUser?.id && (
-                    <span style={{ fontSize: '10px', background: 'var(--accent-light)', color: 'var(--accent)', padding: '1px 7px', borderRadius: '10px', fontWeight: 600 }}>Você</span>
-                  )}
-                  <button
-                    className="btn-icon"
-                    style={{ width: '20px', height: '20px', fontSize: '11px', color: 'var(--text3)', opacity: 0.6 }}
-                    onClick={() => openEditName(user)}
-                    title="Editar nome"
-                  >✏️</button>
-                </div>
-              )}
-              <div style={{ fontSize: '12px', color: 'var(--text3)' }}>@{user.email || user.name?.toLowerCase()}</div>
-            </div>
+                    </div>
+                  )
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 600 }}>{user.name}</span>
+                    {isOwn && <span style={{ fontSize: '10px', background: 'var(--accent-light)', color: 'var(--accent)', padding: '1px 7px', borderRadius: '10px', fontWeight: 600 }}>Você</span>}
+                    {isSA  && <span style={{ fontSize: '10px', background: '#fee2e2', color: '#ef4444', padding: '1px 7px', borderRadius: '10px', fontWeight: 600 }}>Super Admin</span>}
+                    {/* Botão editar nome — exceto super_admin e próprio */}
+                    {canAct && (
+                      <button className="btn-icon" style={{ width: '20px', height: '20px', fontSize: '11px', color: 'var(--text3)', opacity: 0.6 }} onClick={() => openEditName(user)} title="Editar nome">✏️</button>
+                    )}
+                  </div>
+                )}
+                <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{user.email || currentUser?.email}</div>
+              </div>
 
-            {/* Seletor de papel */}
-            <select
-              value={user.role}
-              onChange={e => updateUserRole(user.id, e.target.value)}
-              disabled={user.id === currentUser?.id}
-              style={{
-                fontSize: '12px', padding: '4px 8px',
-                border: '1px solid var(--border)', borderRadius: '6px',
-                background: ROLES[user.role]?.bg, color: ROLES[user.role]?.color,
-                fontFamily: 'Poppins, sans-serif', fontWeight: 600,
-                cursor: user.id === currentUser?.id ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {ROLE_OPTIONS.map(r => <option key={r} value={r}>{ROLES[r].label}</option>)}
-            </select>
-
-            {/* Botão ver como (só para outros usuários) */}
-            {user.id !== currentUser?.id && (
-              <button
-                className="btn btn-ghost"
-                style={{ fontSize: '11px', padding: '4px 10px', whiteSpace: 'nowrap' }}
-                onClick={() => handleViewAs(user)}
-                title="Visualizar o app como esse usuário"
+              {/* Seletor de papel */}
+              <select
+                value={user.role}
+                onChange={e => updateUserRole(user.id, e.target.value)}
+                disabled={!canAct || (!isSuperAdmin && user.role === 'super_admin')}
+                style={{
+                  fontSize: '12px', padding: '4px 8px',
+                  border: '1px solid var(--border)', borderRadius: '6px',
+                  background: ROLES[user.role]?.bg || 'var(--surface2)',
+                  color: ROLES[user.role]?.color || 'var(--text)',
+                  fontFamily: 'Poppins, sans-serif', fontWeight: 600,
+                  cursor: canAct ? 'pointer' : 'not-allowed',
+                }}
               >
-                👁 Ver como
-              </button>
-            )}
+                {[...ROLE_OPTIONS, ...(isSuperAdmin ? ['super_admin'] : [])].map(r =>
+                  <option key={r} value={r}>{ROLES[r]?.label || r}</option>
+                )}
+              </select>
 
-            {/* Reset de senha */}
-            {user.id !== currentUser?.id && (
-              resetingPwd === user.id ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                  {pwdSuccess === user.id ? (
-                    <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>✅ Senha redefinida</span>
-                  ) : (
-                    <>
-                      <input
-                        type="text"
-                        placeholder="Nova senha (mín. 6)"
-                        value={newPwd}
-                        onChange={e => { setNewPwd(e.target.value); setPwdError('') }}
-                        style={{ fontSize: '11px', padding: '4px 8px', width: '150px', border: pwdError ? '1px solid var(--red)' : '1px solid var(--border)', borderRadius: '6px', background: 'var(--surface2)', color: 'var(--text1)' }}
-                        autoFocus
-                      />
-                      {pwdError && <span style={{ fontSize: '10px', color: 'var(--red)' }}>{pwdError}</span>}
-                      <button className="btn btn-ghost" style={{ fontSize: '11px', padding: '4px 8px' }} onClick={() => { setResetingPwd(null); setNewPwd(''); setPwdError('') }}>Cancelar</button>
-                      <button className="btn btn-primary" style={{ fontSize: '11px', padding: '4px 8px' }} onClick={() => handleResetPwd(user.id)}>Salvar</button>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <button className="btn btn-ghost" style={{ fontSize: '11px', padding: '4px 8px', whiteSpace: 'nowrap' }} onClick={() => openResetPwd(user.id)} title="Redefinir senha">
-                  🔑 Senha
+              {/* Ver como */}
+              {canAct && (
+                <button className="btn btn-ghost" style={{ fontSize: '11px', padding: '4px 10px', whiteSpace: 'nowrap' }} onClick={() => handleViewAs(user)} title="Ver o app como este usuário">
+                  👁 Ver como
                 </button>
-              )
-            )}
+              )}
 
-            {/* Remover */}
-            {user.id !== currentUser?.id && (
-              confirmRemove === user.id ? (
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button className="btn btn-ghost" style={{ fontSize: '11px', padding: '4px 8px' }} onClick={() => setConfirmRemove(null)}>Cancelar</button>
-                  <button className="btn" style={{ fontSize: '11px', padding: '4px 8px', background: 'var(--red)', color: 'white', border: 'none' }} onClick={() => { removeUser(user.id); setConfirmRemove(null) }}>
-                    Remover
-                  </button>
-                </div>
-              ) : (
-                <button className="btn-icon" style={{ width: '28px', height: '28px', fontSize: '12px', color: 'var(--red)' }} onClick={() => setConfirmRemove(user.id)} title="Remover">✕</button>
-              )
-            )}
-          </div>
-        ))}
+              {/* Remover */}
+              {canAct && (
+                confirmRemove === user.id ? (
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button className="btn btn-ghost" style={{ fontSize: '11px', padding: '4px 8px' }} onClick={() => setConfirmRemove(null)}>Cancelar</button>
+                    <button className="btn" style={{ fontSize: '11px', padding: '4px 8px', background: 'var(--red)', color: 'white', border: 'none' }} onClick={() => { removeUser(user.id); setConfirmRemove(null) }}>
+                      Remover
+                    </button>
+                  </div>
+                ) : (
+                  <button className="btn-icon" style={{ width: '28px', height: '28px', fontSize: '12px', color: 'var(--red)' }} onClick={() => setConfirmRemove(user.id)} title="Remover">✕</button>
+                )
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Nota sobre reset de senha */}
+      <div style={{ marginTop: '16px', padding: '12px 16px', background: 'var(--surface2)', borderRadius: '8px', fontSize: '12px', color: 'var(--text3)', lineHeight: 1.6 }}>
+        🔐 <strong style={{ color: 'var(--text2)' }}>Reset de senha:</strong> Para redefinir a senha de um usuário, vá ao painel do Supabase → Authentication → Users → clique no usuário → Send password reset email. Isso envia um link seguro direto para o e-mail do usuário.
       </div>
     </>
   )

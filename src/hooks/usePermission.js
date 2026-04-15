@@ -1,30 +1,34 @@
 import { useAuth } from '../context/AuthContext'
 
 export function usePermission() {
-  const { currentUser, effectiveUser, viewingAs } = useAuth()
+  const { profile, effectiveUser, viewingAs } = useAuth()
 
-  // role efetivo = role do usuário visualizado (ou do próprio usuário logado)
+  // Role efetivo (pode ser do usuário impersonado)
   const role = effectiveUser?.role || 'viewer'
-  // role real do admin logado (nunca muda mesmo em modo "ver como")
-  const actualRole = currentUser?.role || 'viewer'
+  // Role real do usuário logado (nunca muda em modo "ver como")
+  const actualRole = profile?.role || 'viewer'
+
+  const isSuperAdmin   = actualRole === 'super_admin'
+  const isActualAdmin  = actualRole === 'admin' || actualRole === 'super_admin'
 
   return {
     role,
-    isAdmin:        role === 'admin',
-    isEditor:       role === 'editor',
-    isViewer:       role === 'viewer',
-    canEdit:        role === 'admin' || role === 'editor',
-    canDelete:      role === 'admin' || role === 'editor',
-    canComment:     role === 'admin' || role === 'editor',
+    isAdmin:         role === 'admin' || role === 'super_admin',
+    isEditor:        role === 'editor',
+    isViewer:        role === 'viewer',
+    canEdit:         role !== 'viewer',
+    canDelete:       role !== 'viewer',
+    canComment:      role !== 'viewer',
 
-    // Ações exclusivas do admin real (não são afetadas pelo "ver como")
-    canArchive:     actualRole === 'admin',
-    canManageUsers: actualRole === 'admin',
-    canSeeHidden:   actualRole === 'admin',
-    isActualAdmin:  actualRole === 'admin',
+    // Ações exclusivas do admin real (não afetadas pelo "ver como")
+    canArchive:      isActualAdmin,
+    canManageUsers:  isActualAdmin,
+    canSeeHidden:    isActualAdmin,
+    isActualAdmin,
+    isSuperAdmin,
 
     // Metadados do "ver como"
-    isViewingAs:    !!viewingAs,
-    viewingAsUser:  viewingAs,
+    isViewingAs:     !!viewingAs,
+    viewingAsUser:   viewingAs,
   }
 }

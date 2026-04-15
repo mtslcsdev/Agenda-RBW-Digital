@@ -227,7 +227,7 @@ export default function DocEditor() {
           </span>
         </div>
 
-        {/* Rich Editor */}
+        {/* Rich Editor (TipTap) */}
         <RichEditor
           value={content}
           onChange={handleContentChange}

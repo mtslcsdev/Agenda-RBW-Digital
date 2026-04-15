@@ -14,7 +14,7 @@ function toInputDate(iso) {
 
 export default function TaskModal({ open, onClose, editingTask = null }) {
   const { clients, addTask, editTask } = useApp()
-  const { currentUser, users } = useAuth()
+  const { profile, users, effectiveUser } = useAuth()
   const { canEdit } = usePermission()
   const overlayRef = useRef()
   const [selectedTag, setSelectedTag] = useState('N8N')
@@ -47,8 +47,8 @@ export default function TaskModal({ open, onClose, editingTask = null }) {
       done: taskStatus === 'concluido',
       assigneeName: fd.get('assigneeName') || '',
     }
-    if (isEdit) editTask(editingTask.id, data, currentUser)
-    else addTask(data, currentUser)
+    if (isEdit) editTask(editingTask.id, data, effectiveUser)
+    else addTask(data, effectiveUser)
     onClose()
     e.target.reset()
   }

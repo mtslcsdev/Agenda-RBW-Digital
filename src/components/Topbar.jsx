@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { useAuth, ROLES } from '../context/AuthContext'
 import { usePermission } from '../hooks/usePermission'
+import { supabase } from '../lib/supabase'
 import NotificationBell from './NotificationBell'
 import { ActiveTimerBar } from './ui/TimerButton'
 
@@ -11,19 +12,23 @@ function ChangePasswordModal({ onClose }) {
   const [form, setForm] = useState({ current: '', next: '', confirm: '' })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [loading, setLoading] = useState(false)
 
-  function handleSave() {
+  async function handleSave() {
     setError('')
     if (!form.current) return setError('Digite sua senha atual.')
     if (form.next.length < 6) return setError('Nova senha deve ter mínimo 6 caracteres.')
     if (form.next !== form.confirm) return setError('As senhas não coincidem.')
-
-    const users = JSON.parse(localStorage.getItem('rbw_users') || '[]')
-    const user = users.find(u => u.id === currentUser?.id)
-    if (!user || user.password !== form.current) return setError('Senha atual incorreta.')
-
-    const updated = users.map(u => u.id === currentUser.id ? { ...u, password: form.next } : u)
-    localStorage.setItem('rbw_users', JSON.stringify(updated))
+    setLoading(true)
+    // Verifica senha atual fazendo login temporário
+    const { error: verifyErr } = await supabase.auth.signInWithPassword({
+      email: currentUser?.email, password: form.current,
+    })
+    if (verifyErr) { setError('Senha atual incorreta.'); setLoading(false); return }
+    // Atualiza a senha
+    const { error: updErr } = await supabase.auth.updateUser({ password: form.next })
+    setLoading(false)
+    if (updErr) { setError(updErr.message); return }
     setSuccess(true)
   }
 
@@ -55,7 +60,7 @@ function ChangePasswordModal({ onClose }) {
             {error && <div style={{ fontSize: '12px', color: 'var(--red)', marginBottom: '12px' }}>{error}</div>}
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-              <button className="btn btn-primary" onClick={handleSave}>Salvar</button>
+              <button className="btn btn-primary" onClick={handleSave} disabled={loading}>{loading ? 'Salvando...' : 'Salvar'}</button>
             </div>
           </>
         )}
