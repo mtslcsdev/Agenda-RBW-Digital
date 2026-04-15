@@ -107,6 +107,28 @@ export function AuthProvider({ children }) {
 
   async function fetchAllProfiles() { setUsers(loadUsers()) }
 
+  async function resetUserPassword(userId, newPassword) {
+    if (newPassword.length < 6) return { ok: false, error: 'Senha deve ter mínimo 6 caracteres.' }
+    const updated = users.map(u => u.id === userId ? { ...u, password: newPassword } : u)
+    saveUsers(updated)
+    setUsers(updated)
+    return { ok: true }
+  }
+
+  async function renameUser(userId, newName) {
+    const name = newName.trim()
+    if (!name) return { ok: false, error: 'Nome não pode ser vazio.' }
+    const updated = users.map(u => u.id === userId ? { ...u, name, initials: name.slice(0, 2).toUpperCase() } : u)
+    saveUsers(updated)
+    setUsers(updated)
+    if (currentUser?.id === userId) {
+      const upd = { ...currentUser, name, initials: name.slice(0, 2).toUpperCase() }
+      localStorage.setItem('rbw_session', JSON.stringify(upd))
+      setCurrentUser(upd)
+    }
+    return { ok: true }
+  }
+
   const effectiveUser = viewingAs || currentUser
 
   return (
@@ -114,7 +136,7 @@ export function AuthProvider({ children }) {
       currentUser, effectiveUser, users, authLoading,
       viewingAs, startViewingAs, stopViewingAs,
       login, setupFirstAdmin, logout,
-      updateUserRole, removeUser, createInvitedUser, fetchAllProfiles,
+      updateUserRole, removeUser, createInvitedUser, fetchAllProfiles, resetUserPassword, renameUser,
     }}>
       {children}
     </AuthContext.Provider>

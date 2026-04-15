@@ -11,7 +11,7 @@ function genPassword() {
 }
 
 export default function AdminUsuarios() {
-  const { users, currentUser, updateUserRole, removeUser, createInvitedUser, startViewingAs } = useAuth()
+  const { users, currentUser, updateUserRole, removeUser, createInvitedUser, startViewingAs, resetUserPassword, renameUser } = useAuth()
   const { isActualAdmin } = usePermission()
   const navigate = useNavigate()
 
@@ -22,6 +22,14 @@ export default function AdminUsuarios() {
   const [saving, setSaving] = useState(false)
   const [createdUser, setCreatedUser] = useState(null)
   const [confirmRemove, setConfirmRemove] = useState(null)
+  const [resetingPwd, setResetingPwd] = useState(null)
+  const [newPwd, setNewPwd] = useState('')
+  const [pwdError, setPwdError] = useState('')
+  const [pwdSuccess, setPwdSuccess] = useState(null)
+  const [editingName, setEditingName] = useState(null)
+  const [newName, setNewName] = useState('')
+  const [nameError, setNameError] = useState('')
+  const [nameSuccess, setNameSuccess] = useState(null)
 
   if (!isActualAdmin) {
     return (
@@ -54,6 +62,42 @@ export default function AdminUsuarios() {
   function handleViewAs(user) {
     startViewingAs(user)
     navigate('/')
+  }
+
+  async function handleResetPwd(userId) {
+    if (newPwd.length < 6) { setPwdError('Mínimo 6 caracteres'); return }
+    setPwdError('')
+    const { ok, error } = await resetUserPassword(userId, newPwd)
+    if (!ok) { setPwdError(error || 'Erro ao redefinir'); return }
+    setPwdSuccess(userId)
+    setTimeout(() => { setPwdSuccess(null); setResetingPwd(null); setNewPwd('') }, 2000)
+  }
+
+  function openResetPwd(userId) {
+    setResetingPwd(userId)
+    setNewPwd('')
+    setPwdError('')
+    setPwdSuccess(null)
+    setConfirmRemove(null)
+    setEditingName(null)
+  }
+
+  function openEditName(user) {
+    setEditingName(user.id)
+    setNewName(user.name)
+    setNameError('')
+    setNameSuccess(null)
+    setConfirmRemove(null)
+    setResetingPwd(null)
+  }
+
+  async function handleRename(userId) {
+    if (!newName.trim()) { setNameError('Nome obrigatório'); return }
+    setNameError('')
+    const { ok, error } = await renameUser(userId, newName)
+    if (!ok) { setNameError(error || 'Erro ao salvar'); return }
+    setNameSuccess(userId)
+    setTimeout(() => { setNameSuccess(null); setEditingName(null); setNewName('') }, 1500)
   }
 
   return (
@@ -168,12 +212,40 @@ export default function AdminUsuarios() {
               {user.initials || user.name?.slice(0, 2).toUpperCase()}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '13px', fontWeight: 600 }}>{user.name}</span>
-                {user.id === currentUser?.id && (
-                  <span style={{ fontSize: '10px', background: 'var(--accent-light)', color: 'var(--accent)', padding: '1px 7px', borderRadius: '10px', fontWeight: 600 }}>Você</span>
-                )}
-              </div>
+              {editingName === user.id ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  {nameSuccess === user.id ? (
+                    <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>✅ Nome atualizado</span>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        value={newName}
+                        onChange={e => { setNewName(e.target.value); setNameError('') }}
+                        style={{ fontSize: '12px', padding: '4px 8px', width: '140px', border: nameError ? '1px solid var(--red)' : '1px solid var(--border)', borderRadius: '6px', background: 'var(--surface2)', color: 'var(--text1)', fontWeight: 600 }}
+                        autoFocus
+                        onKeyDown={e => { if (e.key === 'Enter') handleRename(user.id); if (e.key === 'Escape') setEditingName(null) }}
+                      />
+                      {nameError && <span style={{ fontSize: '10px', color: 'var(--red)' }}>{nameError}</span>}
+                      <button className="btn btn-ghost" style={{ fontSize: '11px', padding: '3px 7px' }} onClick={() => setEditingName(null)}>✕</button>
+                      <button className="btn btn-primary" style={{ fontSize: '11px', padding: '3px 7px' }} onClick={() => handleRename(user.id)}>Salvar</button>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600 }}>{user.name}</span>
+                  {user.id === currentUser?.id && (
+                    <span style={{ fontSize: '10px', background: 'var(--accent-light)', color: 'var(--accent)', padding: '1px 7px', borderRadius: '10px', fontWeight: 600 }}>Você</span>
+                  )}
+                  <button
+                    className="btn-icon"
+                    style={{ width: '20px', height: '20px', fontSize: '11px', color: 'var(--text3)', opacity: 0.6 }}
+                    onClick={() => openEditName(user)}
+                    title="Editar nome"
+                  >✏️</button>
+                </div>
+              )}
               <div style={{ fontSize: '12px', color: 'var(--text3)' }}>@{user.email || user.name?.toLowerCase()}</div>
             </div>
 
@@ -203,6 +275,35 @@ export default function AdminUsuarios() {
               >
                 👁 Ver como
               </button>
+            )}
+
+            {/* Reset de senha */}
+            {user.id !== currentUser?.id && (
+              resetingPwd === user.id ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  {pwdSuccess === user.id ? (
+                    <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>✅ Senha redefinida</span>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        placeholder="Nova senha (mín. 6)"
+                        value={newPwd}
+                        onChange={e => { setNewPwd(e.target.value); setPwdError('') }}
+                        style={{ fontSize: '11px', padding: '4px 8px', width: '150px', border: pwdError ? '1px solid var(--red)' : '1px solid var(--border)', borderRadius: '6px', background: 'var(--surface2)', color: 'var(--text1)' }}
+                        autoFocus
+                      />
+                      {pwdError && <span style={{ fontSize: '10px', color: 'var(--red)' }}>{pwdError}</span>}
+                      <button className="btn btn-ghost" style={{ fontSize: '11px', padding: '4px 8px' }} onClick={() => { setResetingPwd(null); setNewPwd(''); setPwdError('') }}>Cancelar</button>
+                      <button className="btn btn-primary" style={{ fontSize: '11px', padding: '4px 8px' }} onClick={() => handleResetPwd(user.id)}>Salvar</button>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <button className="btn btn-ghost" style={{ fontSize: '11px', padding: '4px 8px', whiteSpace: 'nowrap' }} onClick={() => openResetPwd(user.id)} title="Redefinir senha">
+                  🔑 Senha
+                </button>
+              )
             )}
 
             {/* Remover */}
