@@ -98,7 +98,7 @@ function AvatarDisplay({ user, size = 32, style = {} }) {
 }
 
 function SearchDropdown({ query, onClose }) {
-  const { tasks, clients, notes } = useApp()
+  const { tasks, clients } = useApp()
   const navigate = useNavigate()
 
   const q = query.toLowerCase().trim()
@@ -112,11 +112,7 @@ function SearchDropdown({ query, onClose }) {
     c.name.toLowerCase().includes(q) || (c.segment || '').toLowerCase().includes(q)
   ).slice(0, 3)
 
-  const matchedNotes = notes.filter(n =>
-    n.title.toLowerCase().includes(q) || (n.content || '').toLowerCase().includes(q)
-  ).slice(0, 3)
-
-  const total = matchedTasks.length + matchedClients.length + matchedNotes.length
+  const total = matchedTasks.length + matchedClients.length
   if (total === 0) {
     return (
       <div className="search-dropdown">
@@ -160,20 +156,6 @@ function SearchDropdown({ query, onClose }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: '13px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
                 {c.segment && <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{c.segment}</div>}
-              </div>
-            </div>
-          ))}
-        </>
-      )}
-      {matchedNotes.length > 0 && (
-        <>
-          <div className="search-dropdown-section">NOTAS</div>
-          {matchedNotes.map(n => (
-            <div key={n.id} className="search-dropdown-item" onClick={() => go('/notas')}>
-              <span>📝</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '13px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title}</div>
-                {n.project && <div style={{ fontSize: '11px', color: 'var(--text3)' }}>{n.project}</div>}
               </div>
             </div>
           ))}

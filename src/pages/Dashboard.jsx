@@ -2,7 +2,6 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import StatCard from '../components/ui/StatCard'
 import TaskItem from '../components/ui/TaskItem'
-import NoteCard from '../components/ui/NoteCard'
 import ActivityFeed from '../components/ui/ActivityFeed'
 import { clientSlug } from './ClientDetail'
 
@@ -14,7 +13,7 @@ const scheduleItems = [
 ]
 
 export default function Dashboard({ onNewTask, onEditTask }) {
-  const { tasks, toggleTask, deleteTask, clients, notes } = useApp()
+  const { tasks, toggleTask, deleteTask, clients } = useApp()
   const navigate = useNavigate()
 
   const today = new Date().toISOString().slice(0, 10)
@@ -35,9 +34,6 @@ export default function Dashboard({ onNewTask, onEditTask }) {
   const nextDeadline = tasks
     .filter(t => !t.done && t.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date))[0]
-
-  // Pinned notes first
-  const sortedNotes = [...notes].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0))
 
   return (
     <>
@@ -123,46 +119,26 @@ export default function Dashboard({ onNewTask, onEditTask }) {
         </div>
       </div>
 
-      <div className="two-col">
-        {/* Clientes */}
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">◉ Clientes</span>
-            <button className="card-action" onClick={() => navigate('/clientes')}>Ver todos</button>
-          </div>
-          {clients.slice(0, 4).map(client => (
-            <div
-              key={client.id}
-              className="client-item"
-              onClick={() => navigate(`/clientes/${clientSlug(client.name)}`)}
-            >
-              <div className="client-avatar" style={{ background: client.color }}>{client.initials}</div>
-              <div className="client-info">
-                <p>{client.name}</p>
-                <span>{client.segment} · {tasks.filter(t => t.client === client.name).length} tarefas</span>
-              </div>
-              <span className={`client-status task-tag tag-${client.statusColor}`}>{client.status}</span>
-            </div>
-          ))}
+      {/* Clientes */}
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">◉ Clientes</span>
+          <button className="card-action" onClick={() => navigate('/clientes')}>Ver todos</button>
         </div>
-
-        {/* Notas Recentes */}
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">◻ Notas Recentes</span>
-            <button className="card-action" onClick={() => navigate('/notas')}>Ver todas</button>
+        {clients.slice(0, 4).map(client => (
+          <div
+            key={client.id}
+            className="client-item"
+            onClick={() => navigate(`/clientes/${clientSlug(client.name)}`)}
+          >
+            <div className="client-avatar" style={{ background: client.color }}>{client.initials}</div>
+            <div className="client-info">
+              <p>{client.name}</p>
+              <span>{client.segment} · {tasks.filter(t => t.client === client.name).length} tarefas</span>
+            </div>
+            <span className={`client-status task-tag tag-${client.statusColor}`}>{client.status}</span>
           </div>
-          {sortedNotes.slice(0, 2).map((note, i) => (
-            <div key={note.id} style={{ marginTop: i > 0 ? '10px' : undefined }}>
-              <NoteCard note={note} showActions={false} preview />
-            </div>
-          ))}
-          {notes.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text3)', fontSize: '12px' }}>
-              Nenhuma nota ainda
-            </div>
-          )}
-        </div>
+        ))}
       </div>
 
       {/* Atividade Recente */}
