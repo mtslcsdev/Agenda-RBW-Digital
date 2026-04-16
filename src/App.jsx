@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { AppProvider, useApp } from './context/AppContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -16,7 +16,9 @@ import ClientDetail from './pages/ClientDetail'
 import AdminUsuarios from './pages/AdminUsuarios'
 import Relatorio from './pages/Relatorio'
 import Docs from './pages/Docs'
-import DocEditor from './pages/DocEditor'
+
+// Carregado apenas quando o usuário abre um documento (TipTap é pesado)
+const DocEditor = lazy(() => import('./pages/DocEditor'))
 
 const PAGE_TITLES = {
   '/': 'Dashboard',
@@ -112,7 +114,11 @@ function AppLayout() {
             <Route path="/clientes" element={<Clientes onNew={openNewClient} onEdit={openEditClient} />} />
             <Route path="/clientes/:id" element={<ClientDetail onNewTask={openNewTask} onEditTask={openEditTask} onEditClient={openEditClient} />} />
             <Route path="/docs" element={<Docs />} />
-            <Route path="/docs/:id" element={<DocEditor />} />
+            <Route path="/docs/:id" element={
+              <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: 'var(--text3)', fontSize: '13px' }}>Carregando editor...</div>}>
+                <DocEditor />
+              </Suspense>
+            } />
             <Route path="/admin" element={<AdminUsuarios />} />
             <Route path="/relatorio/:clientId" element={<Relatorio />} />
           </Routes>
