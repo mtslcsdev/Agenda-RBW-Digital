@@ -11,12 +11,16 @@
 CREATE TABLE IF NOT EXISTS public.profiles (
   id         uuid        PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   name       text,
-  role       text        NOT NULL DEFAULT 'viewer'
-                         CHECK (role IN ('super_admin', 'admin', 'editor', 'viewer')),
+  role       text        NOT NULL DEFAULT 'viewer',
   initials   text,
   color      text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Garante que a constraint inclui super_admin (idempotente)
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_role_check
+  CHECK (role IN ('super_admin', 'admin', 'editor', 'viewer'));
 
 
 -- ============================================================
