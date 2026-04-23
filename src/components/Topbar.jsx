@@ -3,32 +3,27 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { useAuth, ROLES } from '../context/AuthContext'
 import { usePermission } from '../hooks/usePermission'
-import { supabase } from '../lib/supabase'
 import NotificationBell from './NotificationBell'
 import { ActiveTimerBar } from './ui/TimerButton'
 
 function ChangePasswordModal({ onClose }) {
-  const { currentUser } = useAuth()
+  const { profile, verifyPassword, resetUserPassword } = useAuth()
   const [form, setForm] = useState({ current: '', next: '', confirm: '' })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  async function handleSave() {
+  function handleSave() {
     setError('')
     if (!form.current) return setError('Digite sua senha atual.')
-    if (form.next.length < 6) return setError('Nova senha deve ter mínimo 6 caracteres.')
+    if (form.next.length < 4) return setError('Nova senha deve ter mínimo 4 caracteres.')
     if (form.next !== form.confirm) return setError('As senhas não coincidem.')
-    setLoading(true)
-    // Verifica senha atual fazendo login temporário
-    const { error: verifyErr } = await supabase.auth.signInWithPassword({
-      email: currentUser?.email, password: form.current,
-    })
-    if (verifyErr) { setError('Senha atual incorreta.'); setLoading(false); return }
-    // Atualiza a senha
-    const { error: updErr } = await supabase.auth.updateUser({ password: form.next })
-    setLoading(false)
-    if (updErr) { setError(updErr.message); return }
+    if (!verifyPassword(profile?.id, form.current)) {
+      setError('Senha atual incorreta.')
+      return
+    }
+    const result = resetUserPassword(profile?.id, form.next)
+    if (!result.ok) { setError(result.error); return }
     setSuccess(true)
   }
 

@@ -1,182 +1,152 @@
-import { createContext, useContext, useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { createContext, useContext, useState } from 'react'
 
 const AuthContext = createContext(null)
 
 export const ROLES = {
-  super_admin: { label: 'Super Admin', color: '#ef4444',       bg: '#fee2e2' },
+  super_admin: { label: 'Super Admin', color: '#ef4444',        bg: '#fee2e2' },
   admin:       { label: 'Admin',       color: 'var(--accent2)', bg: 'var(--accent2-light)' },
   editor:      { label: 'Editor',      color: 'var(--accent3)', bg: 'var(--accent3-light)' },
   viewer:      { label: 'Viewer',      color: 'var(--text3)',   bg: 'var(--surface2)' },
 }
 
-// ID fixo do super_admin — preenchido após rodar migration_v2.sql
-// Substitua este valor pelo UUID real após criar o usuário no Supabase Auth Dashboard
-const SUPER_ADMIN_EMAIL = 'mateus@rbw.com'
+const COLORS = ['#2D6A4F', '#5B4FCF', '#E07A3A', '#D94F3D', '#E8A923', '#3A7CA5']
+const LS_USERS   = 'rbw_users_v2'
+const LS_SESSION = 'rbw_session_v2'
+
+const SEED_USERS = [
+  {
+    id: 'user-rbw-admin',
+    name: 'Mateus',
+    email: 'mateus@rbw.com',
+    password: 'rbw2024',
+    role: 'super_admin',
+    initials: 'MA',
+    color: '#2D6A4F',
+    createdAt: '2024-01-01',
+  },
+]
+
+function loadUsers() {
+  try {
+    const stored = localStorage.getItem(LS_USERS)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+    }
+  } catch {}
+  localStorage.setItem(LS_USERS, JSON.stringify(SEED_USERS))
+  return SEED_USERS
+}
+
+function saveUsers(users) {
+  try { localStorage.setItem(LS_USERS, JSON.stringify(users)) } catch {}
+}
 
 export function AuthProvider({ children }) {
-  const [currentUser, setCurrentUser]   = useState(null)   // auth.User do Supabase
-  const [profile, setProfile]           = useState(null)   // linha da tabela profiles
-  const [users, setUsers]               = useState([])     // todos os profiles (para admin)
-  const [viewingAs, setViewingAs]       = useState(null)   // impersonação
-  const [authLoading, setAuthLoading]   = useState(true)
+  const [users, setUsersState] = useState(() => loadUsers())
+  const [currentUserId, setCurrentUserId] = useState(() => {
+    try { return localStorage.getItem(LS_SESSION) || null } catch { return null }
+  })
+  const [viewingAs, setViewingAs] = useState(null)
 
-  // ── Carrega profile a partir do userId ──────────────────────
-  async function loadProfile(userId) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-    if (!error && data) setProfile(data)
-    return data
+  // Synchronous localStorage — never blocks, always instant
+  const authLoading = false
+
+  function _setUsers(updated) {
+    setUsersState(updated)
+    saveUsers(updated)
   }
 
-  // ── Inicializa sessão e escuta mudanças ──────────────────────
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setCurrentUser(session.user)
-        loadProfile(session.user.id).finally(() => setAuthLoading(false))
-      } else {
-        setAuthLoading(false)
-      }
-    })
+  const currentUser = users.find(u => u.id === currentUserId) || null
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (session?.user) {
-          setCurrentUser(session.user)
-          await loadProfile(session.user.id)
-        } else {
-          setCurrentUser(null)
-          setProfile(null)
-          setViewingAs(null)
-        }
-        setAuthLoading(false)
-      }
-    )
+  const profile = currentUser
+    ? { id: currentUser.id, name: currentUser.name, email: currentUser.email,
+        role: currentUser.role, initials: currentUser.initials, color: currentUser.color }
+    : null
 
-    return () => subscription.unsubscribe()
-  }, [])
+  const effectiveUser = viewingAs || profile
 
   // ── Login ────────────────────────────────────────────────────
-  async function login(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) return { ok: false, error: error.message }
-    return { ok: true, data }
+  function login(email, password) {
+    const found = users.find(u =>
+      u.email.toLowerCase() === email.toLowerCase().trim() && u.password === password
+    )
+    if (!found) return { ok: false, error: 'E-mail ou senha incorretos.' }
+    setCurrentUserId(found.id)
+    try { localStorage.setItem(LS_SESSION, found.id) } catch {}
+    return { ok: true }
   }
 
   // ── Logout ───────────────────────────────────────────────────
-  async function logout() {
+  function logout() {
+    setCurrentUserId(null)
     setViewingAs(null)
-    await supabase.auth.signOut()
+    try { localStorage.removeItem(LS_SESSION) } catch {}
   }
 
-  // ── Carregar todos os perfis (admin) ─────────────────────────
-  async function fetchAllProfiles() {
-    const { data } = await supabase.from('profiles').select('*').order('created_at')
-    if (data) setUsers(data)
+  // ── Recarregar lista ─────────────────────────────────────────
+  function fetchAllProfiles() {
+    setUsersState(loadUsers())
   }
 
-  // ── Criar usuário convidado ───────────────────────────────────
-  // NOTA: signUp em apps frontend-only substitui a sessão atual.
-  // Para ambiente de produção, use uma Supabase Edge Function com service_role key.
-  // Esta implementação salva a sessão do admin e a restaura após criar o usuário.
-  async function createInvitedUser(email, password, name, role) {
-    // Salva sessão do admin
-    const { data: { session: adminSession } } = await supabase.auth.getSession()
-    if (!adminSession) return { ok: false, error: 'Sessão expirada' }
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
+  // ── Criar usuário ─────────────────────────────────────────────
+  function createInvitedUser(email, password, name, role) {
+    const existing = users.find(u => u.email.toLowerCase() === email.toLowerCase().trim())
+    if (existing) return { ok: false, error: 'E-mail já cadastrado.' }
+    if (!password || password.length < 4) return { ok: false, error: 'Senha deve ter mínimo 4 caracteres.' }
+    const newUser = {
+      id: 'user-' + Date.now(),
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
       password,
-      options: { data: { name, role } },
-    })
-
-    if (error) {
-      // Restaura sessão do admin em caso de erro
-      await supabase.auth.setSession({
-        access_token: adminSession.access_token,
-        refresh_token: adminSession.refresh_token,
-      })
-      return { ok: false, error: error.message }
+      role,
+      initials: name.trim().slice(0, 2).toUpperCase(),
+      color: COLORS[users.length % COLORS.length],
+      createdAt: new Date().toISOString().slice(0, 10),
     }
-
-    const newUserId = data?.user?.id
-
-    // Restaura sessão do admin imediatamente
-    await supabase.auth.setSession({
-      access_token: adminSession.access_token,
-      refresh_token: adminSession.refresh_token,
-    })
-
-    // Atualiza o profile criado pelo trigger com role correto
-    if (newUserId) {
-      await supabase.from('profiles').upsert({
-        id: newUserId,
-        name: name.trim(),
-        initials: name.trim().slice(0, 2).toUpperCase(),
-        role,
-        color: '#3A7CA5',
-      })
-      await fetchAllProfiles()
-    }
-
+    _setUsers([...users, newUser])
     return { ok: true }
   }
 
   // ── Atualizar papel ──────────────────────────────────────────
-  async function updateUserRole(userId, role) {
-    await supabase.from('profiles').update({ role }).eq('id', userId)
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u))
-    if (profile?.id === userId) setProfile(p => ({ ...p, role }))
+  function updateUserRole(userId, role) {
+    _setUsers(users.map(u => u.id === userId ? { ...u, role } : u))
   }
 
   // ── Remover usuário ──────────────────────────────────────────
-  async function removeUser(userId) {
-    await supabase.from('profiles').delete().eq('id', userId)
-    setUsers(prev => prev.filter(u => u.id !== userId))
+  function removeUser(userId) {
+    _setUsers(users.filter(u => u.id !== userId))
   }
 
   // ── Renomear usuário ─────────────────────────────────────────
-  async function renameUser(userId, newName) {
+  function renameUser(userId, newName) {
     const name = newName.trim()
     if (!name) return { ok: false, error: 'Nome não pode ser vazio.' }
     const initials = name.slice(0, 2).toUpperCase()
-    await supabase.from('profiles').update({ name, initials }).eq('id', userId)
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, name, initials } : u))
-    if (profile?.id === userId) setProfile(p => ({ ...p, name, initials }))
+    _setUsers(users.map(u => u.id === userId ? { ...u, name, initials } : u))
     return { ok: true }
   }
 
-  // ── Reset de senha (UI-level; real reset requer Edge Function) ─
-  // Fluxo prático: admin chama resetPasswordForEmail, usuário recebe email
-  async function resetUserPassword(userId, _newPassword) {
-    // Encontra email do usuário nos profiles carregados
-    const userProfile = users.find(u => u.id === userId)
-    if (!userProfile) return { ok: false, error: 'Usuário não encontrado' }
+  // ── Reset de senha ───────────────────────────────────────────
+  function resetUserPassword(userId, newPassword) {
+    if (!newPassword || newPassword.length < 4) return { ok: false, error: 'Senha deve ter mínimo 4 caracteres.' }
+    _setUsers(users.map(u => u.id === userId ? { ...u, password: newPassword } : u))
+    return { ok: true }
+  }
 
-    // Nota: alterar senha de outro usuário requer service_role (Edge Function).
-    // Por ora, envia email de redefinição para o usuário.
-    // Para alterar diretamente, implemente: POST /functions/v1/reset-password
-    return { ok: false, error: 'Redefinição direta requer Edge Function com service_role. Envie o email de reset para o usuário.' }
+  // ── Verifica senha atual (para change-password modal) ────────
+  function verifyPassword(userId, password) {
+    const user = users.find(u => u.id === userId)
+    return !!(user && user.password === password)
   }
 
   // ── Impersonação ─────────────────────────────────────────────
   function startViewingAs(user) { setViewingAs(user) }
-  function stopViewingAs() { setViewingAs(null) }
-
-  // ── effectiveUser combina auth.User + profile (ou viewingAs) ─
-  const baseUser = currentUser && profile
-    ? { ...profile, email: currentUser.email, id: profile.id }
-    : null
-
-  const effectiveUser = viewingAs || baseUser
+  function stopViewingAs()      { setViewingAs(null) }
 
   return (
     <AuthContext.Provider value={{
-      currentUser,
+      currentUser: profile,
       profile,
       effectiveUser,
       users,
@@ -192,8 +162,9 @@ export function AuthProvider({ children }) {
       removeUser,
       renameUser,
       resetUserPassword,
-      isSuperAdmin: profile?.role === 'super_admin',
-      superAdminEmail: SUPER_ADMIN_EMAIL,
+      verifyPassword,
+      isSuperAdmin: profile?.role === 'super_admin' || profile?.role === 'admin',
+      superAdminEmail: SEED_USERS[0].email,
     }}>
       {children}
     </AuthContext.Provider>
