@@ -111,7 +111,7 @@ const noteRow = n => ({
 })
 
 export function AppProvider({ children }) {
-  const [appLoading, setAppLoading]       = useState(true)
+  const [appLoading, setAppLoading]       = useState(false)
   const [tasks, setTasksState]            = useState([])
   const [clients, setClientsState]        = useState([])
   const [notes, setNotesState]            = useState([])
@@ -137,12 +137,9 @@ export function AppProvider({ children }) {
     localStorage.setItem('fd_activeTimer', JSON.stringify(activeTimer))
   }, [activeTimer])
 
-  // ── Carregamento em 3 fases ───────────────────────────────────
+  // ── Carregamento em background ────────────────────────────────
   useEffect(() => {
-    const safetyTimer = setTimeout(() => setAppLoading(false), 7000)
-    loadAll()
-      .finally(() => clearTimeout(safetyTimer))
-      .then(() => setupRealtime())
+    loadAll().then(() => setupRealtime())
     return () => {
       realtimeRef.current.forEach(ch => supabase.removeChannel(ch))
     }
@@ -159,7 +156,6 @@ export function AppProvider({ children }) {
       if (tRes.data) setTasksState(tRes.data.map(mapTask))
       if (cRes.data) setClientsState(cRes.data.map(mapClient))
       if (nRes.data) setNotesState(nRes.data.map(mapNote))
-      setAppLoading(false)
 
       // Notificações de prazo ao carregar
       const today = new Date().toISOString().slice(0, 10)
@@ -195,7 +191,6 @@ export function AppProvider({ children }) {
 
     } catch (err) {
       console.error('Erro ao carregar dados:', err)
-      setAppLoading(false)
     }
   }
 
