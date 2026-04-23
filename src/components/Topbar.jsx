@@ -13,16 +13,16 @@ function ChangePasswordModal({ onClose }) {
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  function handleSave() {
+  async function handleSave() {
     setError('')
     if (!form.current) return setError('Digite sua senha atual.')
     if (form.next.length < 4) return setError('Nova senha deve ter mínimo 4 caracteres.')
     if (form.next !== form.confirm) return setError('As senhas não coincidem.')
-    if (!verifyPassword(profile?.id, form.current)) {
-      setError('Senha atual incorreta.')
-      return
-    }
-    const result = resetUserPassword(profile?.id, form.next)
+    setLoading(true)
+    const valid = await verifyPassword(profile?.id, form.current)
+    if (!valid) { setError('Senha atual incorreta.'); setLoading(false); return }
+    const result = await resetUserPassword(profile?.id, form.next)
+    setLoading(false)
     if (!result.ok) { setError(result.error); return }
     setSuccess(true)
   }
