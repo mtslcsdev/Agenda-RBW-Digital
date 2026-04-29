@@ -13,7 +13,7 @@ ADD COLUMN IF NOT EXISTS company_id UUID;
 
 -- Expand tasks table with missing fields
 ALTER TABLE public.tasks
-ADD COLUMN IF NOT EXISTS client_id UUID,
+ADD COLUMN IF NOT EXISTS client_id BIGINT,
 ADD COLUMN IF NOT EXISTS assignee_id UUID,
 ADD COLUMN IF NOT EXISTS due_date TIMESTAMPTZ,
 ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'aberta' CHECK (status IN ('aberta', 'em_andamento', 'revisao', 'concluida')),
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS public.events (
   event_type TEXT CHECK (event_type IN ('reuniao', 'call', 'follow_up', 'entrega', 'pagamento', 'renovacao')),
   start_date TIMESTAMPTZ NOT NULL,
   end_date TIMESTAMPTZ,
-  client_id UUID,
+  client_id BIGINT,
   created_by UUID NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS public.comments (
 -- Create checklists table (subtasks)
 CREATE TABLE IF NOT EXISTS public.checklists (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  task_id UUID NOT NULL,
+  task_id BIGINT NOT NULL,
   title TEXT NOT NULL,
   completed BOOLEAN DEFAULT FALSE,
   completed_at TIMESTAMPTZ,
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS public.checklists (
 -- Create onboarding_checklist template
 CREATE TABLE IF NOT EXISTS public.onboarding_checklist (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  client_id UUID NOT NULL,
+  client_id BIGINT NOT NULL,
   title TEXT NOT NULL,
   description TEXT,
   completed BOOLEAN DEFAULT FALSE,
@@ -107,12 +107,10 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(use
 CREATE INDEX IF NOT EXISTS idx_notifications_read ON public.notifications(read);
 CREATE INDEX IF NOT EXISTS idx_onboarding_client_id ON public.onboarding_checklist(client_id);
 
--- Add foreign key for tasks.client_id if not exists
-ALTER TABLE public.tasks
-ADD CONSTRAINT IF NOT EXISTS fk_tasks_client_id
-FOREIGN KEY (client_id) REFERENCES public.clients (id) ON DELETE CASCADE;
+-- Add foreign key for tasks.client_id (if constraint doesn't exist, will be created above)
+-- Note: Foreign key already added in CREATE TABLE IF NOT EXISTS for events/comments
 
--- Add foreign key for tasks.assignee_id if not exists
-ALTER TABLE public.tasks
-ADD CONSTRAINT IF NOT EXISTS fk_tasks_assignee_id
-FOREIGN KEY (assignee_id) REFERENCES public.profiles (id) ON DELETE SET NULL;
+-- Optional: Uncomment below if you need to add FK manually
+-- ALTER TABLE public.tasks
+-- ADD CONSTRAINT fk_tasks_client_id
+-- FOREIGN KEY (client_id) REFERENCES public.clients (id) ON DELETE CASCADE;
