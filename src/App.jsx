@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AppProvider } from './context/AppContext'
 import { Auth } from './pages/Auth'
-import { Dashboard } from './pages/Dashboard'
+import Dashboard from './pages/Dashboard'
 
 function AppContent() {
   const { session, loading } = useAuth()
