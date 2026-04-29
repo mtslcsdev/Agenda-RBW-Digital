@@ -1,51 +1,11 @@
-import { useState, useEffect } from 'react'
-import { supabase } from './lib/supabase'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from './context/AuthContext'
+import { AppProvider } from './context/AppContext'
 import { Auth } from './pages/Auth'
 import { Dashboard } from './pages/Dashboard'
 
-export function App() {
-  const [session, setSession] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      if (session) {
-        loadProfile(session.user.id)
-      }
-      setLoading(false)
-    })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session)
-        if (session) {
-          loadProfile(session.user.id)
-        } else {
-          setUser(null)
-        }
-      }
-    )
-
-    return () => subscription?.unsubscribe()
-  }, [])
-
-  const loadProfile = async (id) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', id)
-        .single()
-
-      if (!error && data) {
-        setUser(data)
-      }
-    } catch (err) {
-      console.error('Erro ao carregar perfil:', err)
-    }
-  }
+function AppContent() {
+  const { session, loading } = useAuth()
 
   if (loading) {
     return (
@@ -54,8 +14,8 @@ export function App() {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #1a3329 0%, #2D6A4F 50%, #1a3329 100%)',
-        color: 'white',
+        background: 'var(--bg)',
+        color: 'var(--text)',
         fontWeight: '600'
       }}>
         Carregando FlowDesk...
@@ -63,5 +23,22 @@ export function App() {
     )
   }
 
-  return session ? <Dashboard session={session} user={user} /> : <Auth />
+  return (
+    <Routes>
+      <Route path="/*" element={session ? <Dashboard /> : <Navigate to="/auth" />} />
+      <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/" />} />
+    </Routes>
+  )
+}
+
+export function App() {
+  return (
+    <Router>
+      <AuthProvider>
+        <AppProvider>
+          <AppContent />
+        </AppProvider>
+      </AuthProvider>
+    </Router>
+  )
 }

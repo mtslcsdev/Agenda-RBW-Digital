@@ -1,57 +1,59 @@
-import styles from './Sidebar.module.css'
+import './Sidebar.css'
+import { useApp } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
 
-export function Sidebar({ currentView, onNavigate, user, theme, onThemeToggle, onLogout }) {
+export function Sidebar({ currentView, onNavigate }) {
+  const { theme, toggleTheme } = useApp()
+  const { user, logout } = useAuth()
+
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'clientes', label: 'Clientes', icon: '👥' },
     { id: 'tarefas', label: 'Tarefas', icon: '✓' },
+    { id: 'agenda', label: 'Calendário', icon: '📅' },
+    { id: 'equipe', label: 'Equipe', icon: '👨‍💼' },
+    { id: 'financeiro', label: 'Financeiro', icon: '💰' },
   ]
 
   return (
-    <aside className={styles.sidebar}>
-      <div className={styles.logo}>
-        <div className={styles.badge}>RBW</div>
+    <aside className="sidebar">
+      <div className="sidebar-logo">
+        <div className="logo-badge">RBW</div>
         <h1>Flow<span>Desk</span></h1>
-        <p>Gestão de Ops</p>
       </div>
 
-      <nav className={styles.nav}>
+      <nav className="sidebar-nav">
         {navItems.map((item) => (
           <button
             key={item.id}
-            className={`${styles.navItem} ${currentView === item.id ? styles.active : ''}`}
+            className={`nav-item ${currentView === item.id ? 'active' : ''}`}
             onClick={() => onNavigate(item.id)}
             title={item.label}
           >
-            <span className={styles.icon}>{item.icon}</span>
-            <span>{item.label}</span>
+            <span className="nav-icon">{item.icon}</span>
+            <span className="nav-label">{item.label}</span>
           </button>
         ))}
       </nav>
 
-      <div className={styles.bottom}>
-        <div className={styles.themeToggle}>
-          <button onClick={onThemeToggle} className={styles.themeBtn} title="Alternar tema">
-            {theme === 'light' ? '🌙' : '☀️'}
-          </button>
-        </div>
+      <div className="sidebar-bottom">
+        <button onClick={toggleTheme} className="theme-btn" title="Alternar tema">
+          {theme === 'light' ? '🌙' : '☀️'}
+        </button>
 
         {user && (
-          <div className={styles.userCard}>
-            <div
-              className={styles.avatar}
-              style={{ background: user.avatar_color }}
-            >
+          <div className="user-card">
+            <div className="user-avatar" style={{ background: user.avatar_color }}>
               {user.avatar_initial}
             </div>
-            <div className={styles.userInfo}>
-              <p>{user.name}</p>
-              <span>{user.role}</span>
+            <div className="user-info">
+              <p className="user-name">{user.name}</p>
+              <span className="user-role">{user.role}</span>
             </div>
           </div>
         )}
 
-        <button onClick={onLogout} className={styles.logout}>
+        <button onClick={logout} className="btn-logout">
           🚪 Sair
         </button>
       </div>
