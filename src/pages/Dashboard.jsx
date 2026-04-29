@@ -7,6 +7,11 @@ import './Dashboard.css'
 
 // Páginas
 import DashboardHome from './DashboardHome'
+import Clients from './Clients'
+import Tasks from './Tasks'
+import Calendar from './Calendar'
+import Team from './Team'
+import Finance from './Finance'
 
 function Dashboard() {
   const navigate = useNavigate()
@@ -22,7 +27,7 @@ function Dashboard() {
     '/financeiro': 'financeiro',
   }
 
-  const currentView = pathToView[location.pathname] || 'dashboard'
+  const currentView = Object.entries(pathToView).find(([path]) => location.pathname === path)?.[1] || 'dashboard'
 
   const handleNavigate = (view) => {
     const viewToPath = {
@@ -53,7 +58,11 @@ function Dashboard() {
         <div className="content">
           <Routes>
             <Route path="/" element={<DashboardHome />} />
-            <Route path="/*" element={<DashboardHome />} />
+            <Route path="/clientes" element={<Clients />} />
+            <Route path="/tarefas" element={<Tasks />} />
+            <Route path="/agenda" element={<Calendar />} />
+            <Route path="/equipe" element={<Team />} />
+            <Route path="/financeiro" element={<Finance />} />
           </Routes>
         </div>
       </div>
