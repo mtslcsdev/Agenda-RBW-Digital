@@ -11,14 +11,20 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const getSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        console.log('Iniciando getSession...')
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        console.log('Session obtida:', session?.user?.id || 'sem usuário')
+        if (sessionError) console.error('Erro getSession:', sessionError)
+
         setSession(session)
         if (session?.user) {
+          console.log('Buscando perfil para:', session.user.id)
           const { data, error } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', session.user.id)
             .single()
+          console.log('Perfil resultado:', { data, error })
           if (!error && data) {
             setUser(data)
           }
@@ -26,6 +32,7 @@ export function AuthProvider({ children }) {
       } catch (err) {
         console.error('Erro ao carregar sessão:', err)
       } finally {
+        console.log('Finalizando carregamento')
         setLoading(false)
       }
     }
