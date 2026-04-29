@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlowDesk — Gestão de Trabalho</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F4F0;
+    --surface: #FFFFFF;
+    --surface2: #EFEFEB;
+    --border: #E0DED8;
+    --text: #1A1916;
+    --text2: #6B6960;
+    --text3: #9B998F;
+    --accent: #2D6A4F;
+    --accent-light: #D8EDE4;
+    --accent2: #E07A3A;
+    --accent2-light: #FDE8D8;
+    --accent3: #5B4FCF;
+    --accent3-light: #E8E5F9;
+    --red: #D94F3D;
+    --red-light: #FBEAE8;
+    --yellow: #E8A923;
+    --yellow-light: #FDF3DC;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 24px rgba(0,0,0,0.08);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  [data-theme="dark"] {
+    --bg: #141412;
+    --surface: #1E1D1A;
+    --surface2: #272521;
+    --border: #333128;
+    --text: #F0EEE8;
+    --text2: #9B998F;
+    --text3: #6B6960;
+    --accent: #52B788;
+    --accent-light: #1A3329;
+    --accent2: #F4945C;
+    --accent2-light: #3A2016;
+    --accent3: #8B80E8;
+    --accent3-light: #221E4A;
+    --red: #E8695A;
+    --red-light: #3A1A16;
+    --yellow: #F2C05A;
+    --yellow-light: #3A2E0C;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2);
+    --shadow-md: 0 4px 24px rgba(0,0,0,0.4);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Poppins', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    font-size: 14px;
+    transition: background 0.3s, color 0.3s;
+  }
+
+  /* === SIDEBAR === */
+  .sidebar {
+    width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 20px 0;
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .logo {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .logo h1 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.5px;
+  }
+  .logo span {
+    color: var(--accent);
+  }
+  .logo p {
+    font-size: 11px;
+    color: var(--text3);
+    font-weight: 400;
+    margin-top: 2px;
+  }
+  .nav-section {
+    padding: 0 12px;
+    margin-bottom: 8px;
+  }
+  .nav-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 0 8px;
+    margin-bottom: 4px;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: var(--accent-light); color: var(--accent); }
+  .nav-item .icon { font-size: 15px; width: 18px; text-align: center; }
+  .nav-item .badge {
+    margin-left: auto;
+    background: var(--accent);
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 20px;
+  }
+
+  .sidebar-bottom {
+    margin-top: auto;
+    padding: 16px 12px 0;
+    border-top: 1px solid var(--border);
+  }
+  .user-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+  .user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .user-info p { font-size: 12px; font-weight: 600; color: var(--text); }
+  .user-info span { font-size: 11px; color: var(--text3); }
+
+  /* === MAIN === */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* TOPBAR */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+  .topbar h2 { font-size: 16px; font-weight: 600; flex: 1; }
+  .topbar-actions { display: flex; align-items: center; gap: 8px; }
+  .btn {
+    padding: 7px 14px;
+    border-radius: var(--radius-sm);
+    font-family: 'Poppins', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--surface2); }
+  .btn-icon {
+    width: 34px; height: 34px;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    transition: all 0.15s;
+  }
+  .btn-icon:hover { background: var(--surface2); }
+
+  /* CONTENT */
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+  }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    background: var(--surface2);
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    width: fit-content;
+  }
+  .tab {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--text2);
+    transition: all 0.15s;
+  }
+  .tab.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+
+  /* STATS */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+  }
+  .stat-card .label { font-size: 11px; font-weight: 500; color: var(--text3); margin-bottom: 8px; }
+  .stat-card .value { font-size: 26px; font-weight: 700; font-family: 'DM Mono', monospace; color: var(--text); }
+  .stat-card .sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+  .stat-card.green .value { color: var(--accent); }
+  .stat-card.orange .value { color: var(--accent2); }
+  .stat-card.purple .value { color: var(--accent3); }
+
+  /* GRID */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+  /* CARD */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    box-shadow: var(--shadow);
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--text); }
+  .card-action { font-size: 11px; color: var(--accent); cursor: pointer; font-weight: 500; }
+
+  /* TASK LIST */
+  .task-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .task-item:last-child { border-bottom: none; }
+  .task-check {
+    width: 16px; height: 16px;
+    border-radius: 4px;
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+    color: white;
+  }
+  .task-check.done { background: var(--accent); border-color: var(--accent); }
+  .task-text { flex: 1; font-size: 12px; color: var(--text); }
+  .task-text.done { text-decoration: line-through; color: var(--text3); }
+  .task-tag {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 20px;
+  }
+  .tag-green { background: var(--accent-light); color: var(--accent); }
+  .tag-orange { background: var(--accent2-light); color: var(--accent2); }
+  .tag-purple { background: var(--accent3-light); color: var(--accent3); }
+  .tag-red { background: var(--red-light); color: var(--red); }
+  .tag-yellow { background: var(--yellow-light); color: var(--yellow); }
+
+  /* CLIENT LIST */
+  .client-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .client-item:last-child { border-bottom: none; }
+  .client-avatar {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: white;
+    flex-shrink: 0;
+  }
+  .client-info p { font-size: 12px; font-weight: 600; color: var(--text); }
+  .client-info span { font-size: 11px; color: var(--text3); }
+  .client-status {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+
+  /* PROGRESS BAR */
+  .progress-wrap { margin-top: 6px; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text3); margin-bottom: 4px; }
+  .progress-bar { height: 5px; background: var(--surface2); border-radius: 10px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 10px; transition: width 0.3s; }
+
+  /* SCHEDULE */
+  .schedule-item {
+    display: flex;
+    gap: 12px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .schedule-item:last-child { border-bottom: none; }
+  .schedule-time { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); width: 44px; flex-shrink: 0; padding-top: 1px; }
+  .schedule-block {
+    flex: 1;
+    border-radius: 6px;
+    padding: 6px 10px;
+  }
+  .schedule-block p { font-size: 12px; font-weight: 500; }
+  .schedule-block span { font-size: 11px; opacity: 0.7; }
+
+  /* NOTE CARD */
+  .note-card {
+    background: var(--yellow-light);
+    border: 1px solid var(--yellow);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text);
+  }
+  .note-card.blue { background: var(--accent3-light); border-color: var(--accent3); }
+  .note-meta { font-size: 10px; color: var(--text3); margin-top: 8px; }
+
+  /* PIPELINE */
+  .pipeline { display: flex; gap: 0; overflow-x: auto; padding-bottom: 4px; }
+  .pipeline-step {
+    flex: 1;
+    min-width: 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    position: relative;
+  }
+  .pipeline-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 12px; left: 60%;
+    width: 80%; height: 2px;
+    background: var(--border);
+    z-index: 0;
+  }
+  .pipeline-step.done:not(:last-child)::after { background: var(--accent); }
+  .step-dot {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    z-index: 1;
+    color: var(--text3);
+    font-weight: 600;
+  }
+  .pipeline-step.done .step-dot { background: var(--accent); border-color: var(--accent); color: white; }
+  .pipeline-step.current .step-dot { border-color: var(--accent2); color: var(--accent2); }
+  .step-label { font-size: 10px; color: var(--text3); text-align: center; font-weight: 500; }
+  .pipeline-step.done .step-label { color: var(--accent); }
+  .pipeline-step.current .step-label { color: var(--accent2); font-weight: 600; }
+
+  /* VIEWS */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* PAGE SPECIFIC */
+  .page-clients .client-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: box-shadow 0.15s;
+  }
+  .page-clients .client-row:hover { box-shadow: var(--shadow-md); }
+  .page-clients .client-row .name { font-weight: 600; font-size: 13px; flex: 1.5; }
+  .page-clients .client-row .detail { font-size: 12px; color: var(--text2); flex: 1; }
+  .page-clients .client-row .tags { display: flex; gap: 6px; flex: 1; }
+
+  /* AGENDA */
+  .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 16px; }
+  .day-col { }
+  .day-header { text-align: center; font-size: 11px; font-weight: 600; color: var(--text3); margin-bottom: 6px; }
+  .day-header.today { color: var(--accent); }
+  .day-num { text-align: center; font-size: 18px; font-weight: 700; font-family: 'DM Mono', monospace; margin-bottom: 8px; }
+  .day-num.today { color: var(--accent); }
+  .day-task {
+    background: var(--accent-light);
+    border-radius: 5px;
+    padding: 4px 7px;
+    font-size: 10px;
+    color: var(--accent);
+    font-weight: 500;
+    margin-bottom: 3px;
+    cursor: pointer;
+  }
+  .day-task.orange { background: var(--accent2-light); color: var(--accent2); }
+  .day-task.purple { background: var(--accent3-light); color: var(--accent3); }
+  .day-task.red { background: var(--red-light); color: var(--red); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 24px;
+    width: 480px;
+    max-width: 95vw;
+    box-shadow: var(--shadow-md);
+    animation: fadeUp 0.2s ease;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .modal h3 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+  .form-group { margin-bottom: 12px; }
+  .form-group label { display: block; font-size: 11px; font-weight: 600; color: var(--text2); margin-bottom: 5px; }
+  .form-group input, .form-group textarea, .form-group select {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Poppins', sans-serif;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-group input:focus, .form-group textarea:focus { border-color: var(--accent); }
+  .form-group textarea { resize: vertical; min-height: 80px; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+  /* Search bar */
+  .search-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 7px 12px;
+    flex: 1;
+    max-width: 280px;
+  }
+  .search-bar input {
+    background: none; border: none; outline: none;
+    font-family: 'Poppins', sans-serif;
+    font-size: 13px; color: var(--text);
+    width: 100%;
+  }
+  .search-bar input::placeholder { color: var(--text3); }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="logo">
+    <h1>Flow<span>Desk</span></h1>
+    <p>Gestão de Operações</p>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Principal</div>
+    <div class="nav-item active" onclick="navigate('dashboard', this)">
+      <span class="icon">⬡</span> Dashboard
+    </div>
+    <div class="nav-item" onclick="navigate('agenda', this)">
+      <span class="icon">📅</span> Agenda
+      <span class="badge">3</span>
+    </div>
+    <div class="nav-item" onclick="navigate('tarefas', this)">
+      <span class="icon">✓</span> Tarefas
+    </div>
+  </div>
+
+  <div class="nav-section" style="margin-top:8px">
+    <div class="nav-label">Clientes</div>
+    <div class="nav-item" onclick="navigate('clientes', this)">
+      <span class="icon">◉</span> Todos os Clientes
+    </div>
+    <div class="nav-item" onclick="navigate('neoprop', this)">
+      <span class="icon">▸</span> Neoprop
+    </div>
+  </div>
+
+  <div class="nav-section" style="margin-top:8px">
+    <div class="nav-label">Organização</div>
+    <div class="nav-item" onclick="navigate('notas', this)">
+      <span class="icon">◻</span> Notas & Docs
+    </div>
+  </div>
+
+  <div class="sidebar-bottom">
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:4px;">
+      <span style="font-size:11px;color:var(--text3)">Tema</span>
+      <button class="btn-icon" onclick="toggleTheme()" style="width:28px;height:28px;font-size:13px;" id="theme-btn">🌙</button>
+    </div>
+    <div class="user-card">
+      <div class="user-avatar">M</div>
+      <div class="user-info">
+        <p>Mateus</p>
+        <span>Ops. Assistant</span>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <h2 id="page-title">Dashboard</h2>
+    <div class="topbar-actions">
+      <div class="search-bar">
+        <span style="color:var(--text3)">🔍</span>
+        <input placeholder="Buscar tarefas, clientes...">
+      </div>
+      <button class="btn btn-primary" onclick="openModal()">+ Novo</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div id="view-dashboard" class="view active">
+      <div class="stats-grid">
+        <div class="stat-card green">
+          <div class="label">TAREFAS CONCLUÍDAS</div>
+          <div class="value">12</div>
+          <div class="sub">esta semana</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="label">EM ANDAMENTO</div>
+          <div class="value">5</div>
+          <div class="sub">aguardando ação</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="label">CLIENTES ATIVOS</div>
+          <div class="value">4</div>
+          <div class="sub">3 com tarefas hoje</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">PRÓXIMO PRAZO</div>
+          <div class="value" style="font-size:18px;padding-top:4px">Qua 09</div>
+          <div class="sub">Contrato Neoprop</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <!-- Tarefas Hoje -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">📋 Tarefas de Hoje</span>
+            <span class="card-action" onclick="navigate('tarefas', document.querySelector('.nav-item:nth-child(3)'))">Ver todas</span>
+          </div>
+          <div class="task-item">
+            <div class="task-check done" onclick="toggleTask(this)">✓</div>
+            <div class="task-text done">Configurar webhook N8N – Neoprop</div>
+            <span class="task-tag tag-green">GHL</span>
+          </div>
+          <div class="task-item">
+            <div class="task-check" onclick="toggleTask(this)"></div>
+            <div class="task-text">Revisar fluxo de aprovação de trader</div>
+            <span class="task-tag tag-orange">N8N</span>
+          </div>
+          <div class="task-item">
+            <div class="task-check" onclick="toggleTask(this)"></div>
+            <div class="task-text">Enviar proposta para novo cliente</div>
+            <span class="task-tag tag-purple">Vendas</span>
+          </div>
+          <div class="task-item">
+            <div class="task-check" onclick="toggleTask(this)"></div>
+            <div class="task-text">Reunião com Joy – engajamento de leads</div>
+            <span class="task-tag tag-yellow">Reunião</span>
+          </div>
+          <div class="task-item">
+            <div class="task-check done" onclick="toggleTask(this)">✓</div>
+            <div class="task-text done">Checar integração Asaas API</div>
+            <span class="task-tag tag-green">Dev</span>
+          </div>
+        </div>
+
+        <!-- Agenda Hoje -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">🕐 Agenda de Hoje</span>
+            <span class="card-action" onclick="navigate('agenda', document.querySelector('.nav-item:nth-child(2)'))">Semana</span>
+          </div>
+          <div class="schedule-item">
+            <div class="schedule-time">09:00</div>
+            <div class="schedule-block" style="background:var(--accent-light)">
+              <p style="color:var(--accent)">Daily – Operações</p>
+              <span style="color:var(--accent)">30 min · com Robervan</span>
+            </div>
+          </div>
+          <div class="schedule-item">
+            <div class="schedule-time">10:30</div>
+            <div class="schedule-block" style="background:var(--accent2-light)">
+              <p style="color:var(--accent2)">Fluxo Neoprop – N8N</p>
+              <span style="color:var(--accent2)">1h · desenvolvimento</span>
+            </div>
+          </div>
+          <div class="schedule-item">
+            <div class="schedule-time">14:00</div>
+            <div class="schedule-block" style="background:var(--accent3-light)">
+              <p style="color:var(--accent3)">Revisão de Automação</p>
+              <span style="color:var(--accent3)">45 min · com Amanda</span>
+            </div>
+          </div>
+          <div class="schedule-item">
+            <div class="schedule-time">16:00</div>
+            <div class="schedule-block" style="background:var(--surface2)">
+              <p>Estudo Meta Ads</p>
+              <span>30 min · individual</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <!-- Clientes recentes -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">◉ Clientes</span>
+            <span class="card-action" onclick="navigate('clientes', null)">Ver todos</span>
+          </div>
+          <div class="client-item" onclick="navigate('neoprop', null)">
+            <div class="client-avatar" style="background:#2D6A4F">NP</div>
+            <div class="client-info">
+              <p>Neoprop</p>
+              <span>Trader Training · 5 tarefas</span>
+            </div>
+            <span class="client-status tag-orange">Em andamento</span>
+          </div>
+          <div class="client-item">
+            <div class="client-avatar" style="background:#5B4FCF">CL</div>
+            <div class="client-info">
+              <p>Cliente B</p>
+              <span>E-commerce · 2 tarefas</span>
+            </div>
+            <span class="client-status tag-green">Ativo</span>
+          </div>
+          <div class="client-item">
+            <div class="client-avatar" style="background:#E07A3A">MK</div>
+            <div class="client-info">
+              <p>Cliente C</p>
+              <span>Marketing · onboarding</span>
+            </div>
+            <span class="client-status tag-yellow">Onboarding</span>
+          </div>
+        </div>
+
+        <!-- Nota rápida -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">◻ Nota Rápida</span>
+            <span class="card-action">Nova nota</span>
+          </div>
+          <div class="note-card">
+            <strong>Neoprop – Fluxo de Aprovação</strong><br>
+            Lembrar de mapear o webhook de rejeição com campo de motivo. 
+            Confirmar com Robervan a estrutura do Switch node para os 3 planos.
+            <div class="note-meta">📅 Hoje · Mateus</div>
+          </div>
+          <div class="note-card blue" style="margin-top:10px">
+            <strong>Guia do Corredor – 5km ebook</strong><br>
+            Validar nos grupos de corrida antes de impulsionar. 
+            Preço: R$29,90 · Hotmart.
+            <div class="note-meta">📅 Ontem · Mateus</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLIENTES -->
+    <div id="view-clientes" class="view page-clients">
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button class="btn btn-primary" onclick="openModal()">+ Novo Cliente</button>
+        <div class="search-bar" style="max-width:220px">
+          <span style="color:var(--text3)">🔍</span>
+          <input placeholder="Buscar cliente...">
+        </div>
+      </div>
+      <div class="client-row" onclick="navigate('neoprop', null)">
+        <div class="client-avatar" style="background:#2D6A4F;border-radius:8px">NP</div>
+        <div class="name">Neoprop</div>
+        <div class="detail">Trader Training Program</div>
+        <div class="detail">robervan@neoprop.com</div>
+        <div class="tags">
+          <span class="task-tag tag-orange">Em andamento</span>
+          <span class="task-tag tag-green">GHL</span>
+          <span class="task-tag tag-orange">N8N</span>
+        </div>
+      </div>
+      <div class="client-row">
+        <div class="client-avatar" style="background:#5B4FCF;border-radius:8px">CB</div>
+        <div class="name">Cliente B</div>
+        <div class="detail">E-commerce / Loja virtual</div>
+        <div class="detail">contato@clienteb.com</div>
+        <div class="tags">
+          <span class="task-tag tag-green">Ativo</span>
+          <span class="task-tag tag-purple">Automação</span>
+        </div>
+      </div>
+      <div class="client-row">
+        <div class="client-avatar" style="background:#E07A3A;border-radius:8px">MK</div>
+        <div class="name">Cliente C</div>
+        <div class="detail">Marketing Digital</div>
+        <div class="detail">contato@clientec.com</div>
+        <div class="tags">
+          <span class="task-tag tag-yellow">Onboarding</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- NEOPROP -->
+    <div id="view-neoprop" class="view">
+      <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:20px">
+        <div class="client-avatar" style="background:#2D6A4F;width:48px;height:48px;border-radius:12px;font-size:16px">NP</div>
+        <div>
+          <h3 style="font-size:17px;font-weight:700">Neoprop</h3>
+          <p style="font-size:12px;color:var(--text3)">Trader Training Program · GHL + N8N + Asaas</p>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn btn-ghost">✏️ Editar</button>
+          <button class="btn btn-primary">+ Tarefa</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="card-title">Pipeline do Projeto</span></div>
+        <div class="pipeline">
+          <div class="pipeline-step done">
+            <div class="step-dot">✓</div>
+            <div class="step-label">Onboarding</div>
+          </div>
+          <div class="pipeline-step done">
+            <div class="step-dot">✓</div>
+            <div class="step-label">GHL Setup</div>
+          </div>
+          <div class="pipeline-step done">
+            <div class="step-dot">✓</div>
+            <div class="step-label">Webhook N8N</div>
+          </div>
+          <div class="pipeline-step current">
+            <div class="step-dot">▸</div>
+            <div class="step-label">Aprovação Trader</div>
+          </div>
+          <div class="pipeline-step">
+            <div class="step-dot">5</div>
+            <div class="step-label">Contrato</div>
+          </div>
+          <div class="pipeline-step">
+            <div class="step-dot">6</div>
+            <div class="step-label">Asaas</div>
+          </div>
+          <div class="pipeline-step">
+            <div class="step-dot">7</div>
+            <div class="step-label">Go-live</div>
+          </div>
+        </div>
+        <div class="progress-wrap" style="margin-top:12px">
+          <div class="progress-label"><span>Progresso geral</span><span>43%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:43%;background:var(--accent)"></div></div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Tarefas Ativas</span></div>
+          <div class="task-item">
+            <div class="task-check done">✓</div>
+            <div class="task-text done">Configurar webhook de aprovação</div>
+          </div>
+          <div class="task-item">
+            <div class="task-check" onclick="toggleTask(this)"></div>
+            <div class="task-text">Fluxo de rejeição com motivo</div>
+          </div>
+          <div class="task-item">
+            <div class="task-check" onclick="toggleTask(this)"></div>
+            <div class="task-text">Switch node – 3 planos Asaas</div>
+          </div>
+          <div class="task-item">
+            <div class="task-check" onclick="toggleTask(this)"></div>
+            <div class="task-text">Integração assinatura de contrato</div>
+          </div>
+          <div class="task-item">
+            <div class="task-check" onclick="toggleTask(this)"></div>
+            <div class="task-text">Testes end-to-end do fluxo</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Notas do Cliente</span></div>
+          <div class="note-card">
+            Confirmar com Robervan estrutura do Switch node para os 3 planos de compra via Asaas.
+            <div class="note-meta">📅 07/04 · Mateus</div>
+          </div>
+          <div style="margin-top:8px">
+            <div class="form-group" style="margin-bottom:0">
+              <textarea placeholder="Adicionar nota..." style="min-height:60px;font-size:12px"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AGENDA -->
+    <div id="view-agenda" class="view">
+      <div class="tabs" style="margin-bottom:16px">
+        <div class="tab active">Semana</div>
+        <div class="tab">Mês</div>
+        <div class="tab">Lista</div>
+      </div>
+      <div class="week-grid">
+        <div class="day-col">
+          <div class="day-header">SEG</div>
+          <div class="day-num">07</div>
+          <div class="day-task">Daily – 09h</div>
+          <div class="day-task orange">N8N Neoprop</div>
+          <div class="day-task purple">Rev. Automação</div>
+        </div>
+        <div class="day-col">
+          <div class="day-header">TER</div>
+          <div class="day-num">08</div>
+          <div class="day-task orange">Reunião Joy</div>
+          <div class="day-task">GHL Config</div>
+        </div>
+        <div class="day-col">
+          <div class="day-header">QUA</div>
+          <div class="day-num">09</div>
+          <div class="day-task red">Prazo Contrato</div>
+          <div class="day-task purple">Meta Ads</div>
+        </div>
+        <div class="day-col">
+          <div class="day-header">QUI</div>
+          <div class="day-num">10</div>
+          <div class="day-task">Daily – 09h</div>
+          <div class="day-task orange">Asaas Testes</div>
+        </div>
+        <div class="day-col">
+          <div class="day-header">SEX</div>
+          <div class="day-num">11</div>
+          <div class="day-task">Rev. Semanal</div>
+          <div class="day-task purple">Ebook 5km</div>
+        </div>
+        <div class="day-col">
+          <div class="day-header">SAB</div>
+          <div class="day-num">12</div>
+          <div class="day-task purple">Ebook – texto</div>
+        </div>
+        <div class="day-col">
+          <div class="day-header">DOM</div>
+          <div class="day-num">13</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">📌 Recorrências</span><button class="btn btn-ghost" style="font-size:11px;padding:4px 10px">+ Rotina</button></div>
+        <div class="task-item">
+          <span class="task-tag tag-green" style="width:60px;text-align:center">Diário</span>
+          <div class="task-text">Daily com Robervan – 09h00</div>
+        </div>
+        <div class="task-item">
+          <span class="task-tag tag-orange" style="width:60px;text-align:center">Semanal</span>
+          <div class="task-text">Revisão de automações ativas – Sex</div>
+        </div>
+        <div class="task-item">
+          <span class="task-tag tag-purple" style="width:60px;text-align:center">Mensal</span>
+          <div class="task-text">Relatório de performance dos clientes</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAREFAS -->
+    <div id="view-tarefas" class="view">
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <div class="tabs" style="margin-bottom:0">
+          <div class="tab active">Todas</div>
+          <div class="tab">Hoje</div>
+          <div class="tab">Semana</div>
+          <div class="tab">Atrasadas</div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn btn-ghost">Filtrar</button>
+          <button class="btn btn-primary" onclick="openModal()">+ Tarefa</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="task-item">
+          <div class="task-check done">✓</div>
+          <div class="task-text done">Configurar webhook N8N – Neoprop</div>
+          <span class="task-tag tag-green">GHL</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:8px">07/04</span>
+        </div>
+        <div class="task-item">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-text">Revisar fluxo de aprovação de trader</div>
+          <span class="task-tag tag-orange">N8N</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:8px">08/04</span>
+        </div>
+        <div class="task-item">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-text">Switch node – 3 planos Asaas</div>
+          <span class="task-tag tag-orange">N8N</span>
+          <span style="font-size:11px;color:var(--red);margin-left:8px">09/04 ⚠️</span>
+        </div>
+        <div class="task-item">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-text">Enviar proposta para novo cliente</div>
+          <span class="task-tag tag-purple">Vendas</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:8px">10/04</span>
+        </div>
+        <div class="task-item">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-text">Reunião com Joy – engajamento de leads</div>
+          <span class="task-tag tag-yellow">Reunião</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:8px">08/04</span>
+        </div>
+        <div class="task-item">
+          <div class="task-check" onclick="toggleTask(this)"></div>
+          <div class="task-text">Rascunho capítulo 1 – Ebook 5km</div>
+          <span class="task-tag tag-purple">Pessoal</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:8px">11/04</span>
+        </div>
+        <div class="task-item">
+          <div class="task-check done">✓</div>
+          <div class="task-text done">Checar integração Asaas API</div>
+          <span class="task-tag tag-green">Dev</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:8px">07/04</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- NOTAS -->
+    <div id="view-notas" class="view">
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button class="btn btn-primary" onclick="openModal('nota')">+ Nova Nota</button>
+        <button class="btn btn-ghost">+ Documento</button>
+      </div>
+      <div class="three-col">
+        <div class="note-card">
+          <strong>🔧 Neoprop – Webhook Rejeição</strong><br><br>
+          Mapear campo de motivo no webhook de rejeição. Verificar com Robervan a estrutura esperada para o Switch node dos 3 planos.
+          <div class="note-meta">📅 07/04/2026 · Neoprop</div>
+        </div>
+        <div class="note-card blue">
+          <strong>🏃 Guia do Corredor – 5km</strong><br><br>
+          Preço: R$29,90 · Hotmart. Validar organicamente primeiro. Estrutura: aquecimento, treino base, progressão, recuperação.
+          <div class="note-meta">📅 06/04/2026 · Pessoal</div>
+        </div>
+        <div class="note-card" style="background:var(--accent3-light);border-color:var(--accent3)">
+          <strong>📊 Meta Ads – Estudo</strong><br><br>
+          Sessões curtas diárias. Foco atual: estrutura de campanha, conjuntos de anúncios, públicos lookalike e retargeting.
+          <div class="note-meta">📅 05/04/2026 · Pessoal</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3 id="modal-title">Nova Tarefa</h3>
+    <div class="form-group">
+      <label>TÍTULO</label>
+      <input placeholder="Ex: Configurar webhook Neoprop">
+    </div>
+    <div class="form-group">
+      <label>CLIENTE / PROJETO</label>
+      <select>
+        <option>Neoprop</option>
+        <option>Cliente B</option>
+        <option>Cliente C</option>
+        <option>Pessoal</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group">
+        <label>DATA</label>
+        <input type="date">
+      </div>
+      <div class="form-group">
+        <label>PRIORIDADE</label>
+        <select>
+          <option>Normal</option>
+          <option>Alta</option>
+          <option>Urgente</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>NOTAS</label>
+      <textarea placeholder="Detalhes, links, referências..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="closeModal()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function navigate(view, navEl) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + view).classList.add('active');
+
+    const titles = {
+      dashboard: 'Dashboard', agenda: 'Agenda', tarefas: 'Tarefas',
+      clientes: 'Clientes', neoprop: 'Neoprop', notas: 'Notas & Documentos'
+    };
+    document.getElementById('page-title').textContent = titles[view] || view;
+
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    if (navEl) navEl.classList.add('active');
+  }
+
+  function toggleTask(el) {
+    el.classList.toggle('done');
+    el.textContent = el.classList.contains('done') ? '✓' : '';
+    const txt = el.nextElementSibling;
+    if (txt) txt.classList.toggle('done');
+  }
+
+  function openModal(type) {
+    document.getElementById('modal').classList.add('open');
+  }
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+  }
+  document.getElementById('modal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  function toggleTheme() {
+    const html = document.documentElement;
+    const isDark = html.getAttribute('data-theme') === 'dark';
+    html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    document.getElementById('theme-btn').textContent = isDark ? '🌙' : '☀️';
+  }
+
+  // Tab interactions
+  document.querySelectorAll('.tabs').forEach(tabs => {
+    tabs.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+      });
+    });
+  });
+</script>
+</body>
+</html>
