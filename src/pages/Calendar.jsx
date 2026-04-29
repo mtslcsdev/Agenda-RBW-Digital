@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useEvents } from '../hooks/useEvents'
 import { Modal } from '../components/ui/Modal'
 import './Calendar.css'
 
 export default function Calendar() {
   const { user } = useAuth()
+  const { events, createEvent, loading } = useEvents()
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [viewMode, setViewMode] = useState('month') // month, week, day
+  const [viewMode, setViewMode] = useState('month')
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [events, setEvents] = useState([])
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -44,24 +45,30 @@ export default function Calendar() {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    const newEvent = {
-      id: Date.now(),
-      ...formData,
-      created_by: user?.id,
+    try {
+      await createEvent({
+        title: formData.title,
+        description: formData.description,
+        event_type: formData.event_type,
+        start_date: formData.start_date + (formData.start_time ? 'T' + formData.start_time : 'T00:00:00'),
+        end_date: formData.end_date ? formData.end_date + (formData.end_time ? 'T' + formData.end_time : 'T00:00:00') : null,
+        created_by: user?.id,
+      })
+      setFormData({
+        title: '',
+        description: '',
+        event_type: 'reuniao',
+        start_date: '',
+        start_time: '',
+        end_date: '',
+        end_time: '',
+      })
+      setIsModalOpen(false)
+    } catch (err) {
+      console.error('Erro ao salvar evento:', err)
     }
-    setEvents([...events, newEvent])
-    setFormData({
-      title: '',
-      description: '',
-      event_type: 'reuniao',
-      start_date: '',
-      start_time: '',
-      end_date: '',
-      end_time: '',
-    })
-    setIsModalOpen(false)
   }
 
   const handleCloseModal = () => {
