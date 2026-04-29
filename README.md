@@ -1,26 +1,43 @@
 # 🚀 FlowDesk - RBW Digital
 
-Platform profissional de gestão de operações e tarefas da equipe com autenticação segura via Supabase.
+**Sistema Profissional de Gestão de Operações** estilo ClickUp/Monday para agências e equipes.
 
-## ✨ Features
+## ✨ Recursos Implementados
 
+### MVP (Fase 1 ✅)
 - ✅ **Autenticação Segura** - Supabase Auth com senhas criptografadas
-- ✅ **Gestão de Clientes** - Crie e organize clientes com status e cores
-- ✅ **Sistema de Tarefas** - Tarefas com prioridade, status e descrição
-- ✅ **Multi-usuário** - Múltiplos usuários simultâneos com sincronização em tempo real
-- ✅ **Tema Claro/Escuro** - Alternância automática de tema
-- ✅ **Interface Responsiva** - Funciona perfeitamente em desktop e mobile
-- ✅ **Dados Persistentes** - Tudo armazenado seguramente no Supabase
-- ✅ **Row Level Security** - Segurança a nível de banco de dados
+- ✅ **Tema Dark/Light** - Design system completo com CSS variables
+- ✅ **Dashboard Executivo** - KPIs, tarefas urgentes, clientes recentes
+- ✅ **Gestão de Clientes CRUD** - Criar, editar, deletar, filtrar por status
+- ✅ **Sistema de Tarefas CRUD** - Prioridade, status, cliente vinculado
+- ✅ **Visão Kanban** - Drag & drop entre colunas de status
+- ✅ **Relatório Financeiro** - Receita recorrente, clientes vencidos
+- ✅ **Roteamento Completo** - React Router com deep links
+- ✅ **Contextos + Hooks** - AuthContext, AppContext, useClients, useTasks
+- ✅ **Sincronização Real-time** - WebSocket via Supabase para mudanças instantâneas
+- ✅ **Interface Responsiva** - Mobile-first, desktop otimizado
+- ✅ **Multi-usuário** - Autenticação + isolamento de dados
+
+### Roadmap (Fase 2 🚀)
+- 🔄 **Calendário** - Visões: hoje, semana, mês. Eventos: reuniões, calls, follow-ups
+- 🔄 **Equipe** - Gestão de membros, roles, permissões por função
+- 🔄 **Onboarding Automático** - Templates, checklists, histórico
+- 🔄 **Comentários em Tempo Real** - Feedback em tarefas e clientes
+- 🔄 **Upload de Arquivos** - Attachments via Supabase Storage
+- 🔄 **Notificações** - Alerts de tarefas vencendo, clientes atrasados
+- 🔄 **Busca Global** - Busca instantânea em clientes e tarefas
+- 🔄 **Multi-tenant** - Suporte a múltiplos workspaces/empresas
 
 ## 🛠️ Stack Técnico
 
-- **Frontend**: React 18 + Vite
-- **Backend**: Supabase (PostgreSQL + Auth)
-- **Autenticação**: Supabase Auth
-- **Banco de Dados**: PostgreSQL com RLS
-- **Estilo**: CSS Modules + CSS Variables
-- **Deploy**: Vercel / Netlify
+- **Frontend**: React 18 + Vite + React Router
+- **State**: Context API + Custom Hooks
+- **Backend**: Supabase (PostgreSQL + Auth + Realtime)
+- **Database**: PostgreSQL com RLS e índices
+- **Styles**: CSS Variables + Responsive Design
+- **Gráficos**: Recharts (pronto para integração)
+- **Drag & Drop**: @hello-pangea/dnd (pronto para integração)
+- **Deploy**: Netlify (CI/CD automático via GitHub)
 
 ## 📋 Como começar
 
@@ -69,24 +86,44 @@ Gera pasta `dist/` pronta para deploy
 ```
 flowdesk/
 ├── src/
-│   ├── components/          # Componentes React reutilizáveis
-│   │   ├── Sidebar.jsx
-│   │   ├── TopBar.jsx
-│   │   ├── ClientList.jsx
-│   │   └── TaskList.jsx
-│   ├── pages/              # Páginas completas
-│   │   ├── Auth.jsx       # Tela de login/signup
-│   │   └── Dashboard.jsx  # Página principal
-│   ├── lib/               # Utilidades
-│   │   └── supabase.js   # Client do Supabase
-│   ├── styles/            # CSS Global
-│   │   └── globals.css
-│   ├── App.jsx           # Componente raiz
-│   └── main.jsx          # Entry point
-├── index.html            # HTML template
-├── vite.config.js        # Config do Vite
+│   ├── context/                 # React Context (State Management)
+│   │   ├── AuthContext.jsx      # Session + User + Profile
+│   │   └── AppContext.jsx       # Theme + Notifications + Search
+│   ├── hooks/                   # Custom Hooks
+│   │   ├── useClients.js        # CRUD para clientes
+│   │   ├── useTasks.js          # CRUD para tarefas
+│   │   ├── useEvents.js         # (placeholder)
+│   │   └── useTeam.js           # (placeholder)
+│   ├── components/
+│   │   ├── ui/                  # Componentes reutilizáveis
+│   │   │   ├── Modal.jsx        # Modal para forms
+│   │   │   ├── Modal.css
+│   │   ├── Sidebar.jsx          # Navegação principal
+│   │   ├── Sidebar.css
+│   │   ├── TopBar.jsx           # Header com busca
+│   │   └── TopBar.css
+│   ├── pages/                   # Páginas completas (rotas)
+│   │   ├── Auth.jsx             # Login/Signup
+│   │   ├── Dashboard.jsx        # Layout + roteamento
+│   │   ├── DashboardHome.jsx    # Dashboard executivo
+│   │   ├── Clients.jsx          # CRUD de clientes
+│   │   ├── Tasks.jsx            # CRUD + Kanban de tarefas
+│   │   ├── Calendar.jsx         # Calendário (placeholder)
+│   │   ├── Team.jsx             # Equipe (placeholder)
+│   │   ├── Finance.jsx          # Relatório financeiro
+│   │   └── *.css                # Estilos por página
+│   ├── lib/
+│   │   └── supabase.js          # Client do Supabase
+│   ├── styles/
+│   │   └── globals.css          # Design system + CSS variables
+│   ├── App.jsx                  # Router + Providers
+│   └── main.jsx                 # Entry point
+├── supabase_migrations.sql      # SQL para setup do banco
+├── index.html                   # HTML template
+├── vite.config.js               # Config do Vite
 ├── package.json
-├── .env                  # Variáveis de ambiente
+├── .env                         # Variáveis de ambiente (git-ignored)
+├── .env.example                 # Template de .env
 └── .gitignore
 ```
 
