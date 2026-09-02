@@ -1,4 +1,4 @@
-import{j as le}from"./index-P9rT-e60.js";import{r as _,R as yt,g as au}from"./router-BxI0xEfA.js";import"./supabase-CsqyQARq.js";import"./dnd-ByT2fkuc.js";var xl={exports:{}},Sl={};/**
+import{j as le}from"./index-CSNQjRbh.js";import{r as _,R as yt,g as au}from"./router-BxI0xEfA.js";import"./supabase-CsqyQARq.js";import"./dnd-ByT2fkuc.js";var xl={exports:{}},Sl={};/**
  * @license React
  * use-sync-external-store-shim.production.js
  *
