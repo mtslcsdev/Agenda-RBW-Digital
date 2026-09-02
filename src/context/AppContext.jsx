@@ -1,5 +1,12 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from './AuthContext'
+
+// Avisos derivados dos dados (recalculados a cada carga) ou puramente de
+// interface não vão para o banco — só encheriam a caixa de repetições.
+const NOTIFICACOES_EFEMERAS = new Set([
+  'overdue', 'deadline', 'error', 'timer.start', 'timer.stop',
+])
 
 const AppContext = createContext(null)
 
@@ -146,6 +153,11 @@ const noteRow = n => ({
 })
 
 export function AppProvider({ children }) {
+  // O AppProvider só é montado depois do login (ver AuthGuard), então aqui
+  // sempre existe um usuário — as notificações são por pessoa.
+  const { currentUser } = useAuth()
+  const usuarioId = currentUser?.id ?? null
+
   const [appLoading, setAppLoading]       = useState(false)
   const [tasks, setTasksState]            = useState([])
   const [clients, setClientsState]        = useState([])
@@ -241,14 +253,26 @@ export function AppProvider({ children }) {
       }
 
       // Fase 2 — background (comments, activity, time)
-      const [cmRes, aRes, eRes, chkRes, lblRes, tlRes] = await Promise.all([
+      const [cmRes, aRes, eRes, chkRes, lblRes, tlRes, nfRes] = await Promise.all([
         supabase.from('comments').select('*').order('created_at', { ascending: true }),
         supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(50),
         supabase.from('time_entries').select('*'),
         supabase.from('task_checklist').select('*').order('position'),
         supabase.from('labels').select('*').order('name'),
         supabase.from('task_labels').select('*'),
+        supabase.from('notifications').select('*')
+          .order('created_at', { ascending: false }).limit(30),
       ])
+
+      if (nfRes.data) {
+        // Os avisos efêmeros desta sessão (ainda com id temporário) continuam
+        // na tela; o resto vem do banco e sobrevive ao recarregar.
+        const doBanco = nfRes.data.map(mapNotification)
+        setNotifications(prev => [
+          ...prev.filter(n => String(n.id).startsWith('tmp-')),
+          ...doBanco,
+        ].slice(0, 30))
+      }
 
       if (chkRes.data) {
         const porTarefa = {}
@@ -346,11 +370,23 @@ export function AppProvider({ children }) {
 
   // ── Helpers internos ──────────────────────────────────────────
   const _notify = useCallback((icon, message, type = 'info') => {
-    setNotifications(prev => [{
-      id: Date.now() + Math.random(), icon, message, type,
+    const local = {
+      id: 'tmp-' + Date.now() + Math.random(), icon, message, type,
       read: false, createdAt: new Date().toISOString(),
-    }, ...prev].slice(0, 30))
-  }, [])
+    }
+    setNotifications(prev => [local, ...prev].slice(0, 30))
+
+    // Os avisos de evento sobrevivem ao recarregar a página; os efêmeros não
+    if (!NOTIFICACOES_EFEMERAS.has(type) && usuarioId) {
+      supabase.from('notifications')
+        .insert({ user_id: usuarioId, icon, message, type })
+        .select().single()
+        .then(({ data }) => {
+          if (data) setNotifications(prev =>
+            prev.map(n => n.id === local.id ? mapNotification(data) : n))
+        })
+    }
+  }, [usuarioId])
 
   const _log = useCallback((actor, action, entityType, entityTitle) => {
     const entry = {
@@ -811,6 +847,17 @@ export function AppProvider({ children }) {
     }
     const task = tasks.find(t => t.id === taskId)
     _notify('💬', `Comentário em: ${task?.title || 'tarefa'}`, 'comment.added')
+
+    // Avisa quem é responsável pela tarefa — só se for outra pessoa, senão
+    // a pessoa receberia notificação do próprio comentário.
+    if (task?.assignee_id && task.assignee_id !== actor.id) {
+      supabase.from('notifications').insert({
+        user_id: task.assignee_id,
+        icon: '💬',
+        message: `${actor.name} comentou em: ${task.title}`,
+        type: 'comment.added',
+      }).then(() => {})
+    }
   }
 
   async function deleteComment(taskId, commentId) {
@@ -823,11 +870,22 @@ export function AppProvider({ children }) {
   function getComments(taskId) { return comments[taskId] || [] }
 
   // ── NOTIFICATIONS ─────────────────────────────────────────────
+  // Só as notificações gravadas têm id do banco; as efêmeras ficam só na tela.
+  const ehDoBanco = id => !String(id).startsWith('tmp-')
+
   function markNotificationRead(id) {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+    if (ehDoBanco(id)) {
+      supabase.from('notifications').update({ read: true }).eq('id', id).then(() => {})
+    }
   }
+
   function markAllRead() {
+    const ids = notifications.filter(n => !n.read && ehDoBanco(n.id)).map(n => n.id)
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    if (ids.length) {
+      supabase.from('notifications').update({ read: true }).in('id', ids).then(() => {})
+    }
   }
 
   // ── TIME TRACKING ─────────────────────────────────────────────

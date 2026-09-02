@@ -23,7 +23,7 @@ function resolverCliente(valor) {
 
 export default function TaskModal({ open, onClose, editingTask = null, preset = null }) {
   const { clients, addTask, editTask, columns } = useApp()
-  const { profile, users, effectiveUser } = useAuth()
+  const { profile, team, effectiveUser } = useAuth()
   const { canEdit } = usePermission()
   const overlayRef = useRef()
   const [selectedTag, setSelectedTag] = useState('N8N')
@@ -56,7 +56,10 @@ export default function TaskModal({ open, onClose, editingTask = null, preset = 
       tagColor: TAG_COLORS[selectedTag] || 'green',
       columnId,
       done: coluna?.isDone || false,
-      assigneeName: fd.get('assigneeName') || '',
+      // Grava o id do responsável; o nome vai junto só para exibição rápida
+      // no card, sem precisar cruzar com a lista da equipe a cada render.
+      assignee_id: fd.get('assignee') || null,
+      assigneeName: team.find(u => u.id === fd.get('assignee'))?.name || '',
     }
     if (isEdit) editTask(editingTask.id, data, effectiveUser)
     else addTask(data, effectiveUser)
@@ -107,9 +110,9 @@ export default function TaskModal({ open, onClose, editingTask = null, preset = 
             </div>
             <div className="form-group">
               <label>RESPONSÁVEL</label>
-              <select name="assigneeName" defaultValue={editingTask?.assigneeName || ''} key={editingTask?.id ?? 'new-assignee'}>
+              <select name="assignee" defaultValue={editingTask?.assignee_id || ''} key={editingTask?.id ?? 'new-assignee'}>
                 <option value="">— Ninguém —</option>
-                {users.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+                {team.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </div>
           </div>

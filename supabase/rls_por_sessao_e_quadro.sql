@@ -153,6 +153,67 @@ CREATE POLICY "rbw_delete" ON public.boards FOR DELETE TO anon, authenticated
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.boards TO anon, authenticated;
 GRANT USAGE, SELECT ON SEQUENCE public.boards_id_seq TO anon, authenticated;
 
+-- ── Quem é o dono da sessão (complementa rbw_role) ────────────
+CREATE OR REPLACE FUNCTION public.rbw_user_id()
+RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT s.user_id FROM public.user_sessions s
+  WHERE s.token = public.rbw_request_token()
+    AND s.expires_at > now();
+$$;
+GRANT EXECUTE ON FUNCTION public.rbw_user_id() TO anon, authenticated;
+
+-- A equipe visível para qualquer pessoa logada. Diferente de rbw_list_users
+-- (painel de admin), aqui não sai e-mail nem hash de senha — só o suficiente
+-- para escolher um responsável.
+CREATE OR REPLACE FUNCTION public.rbw_team(p_token text)
+RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE me public.users;
+BEGIN
+  me := public.rbw_actor(p_token);
+  IF me.id IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Sessão inválida.');
+  END IF;
+  RETURN jsonb_build_object('ok', true, 'team', COALESCE((
+    SELECT jsonb_agg(jsonb_build_object(
+      'id', u.id, 'name', u.name, 'role', u.role,
+      'initials', u.initials, 'color', u.color
+    ) ORDER BY u.name)
+    FROM public.users u), '[]'::jsonb));
+END $$;
+GRANT EXECUTE ON FUNCTION public.rbw_team(text) TO anon, authenticated;
+
+-- ── Notificações por pessoa ───────────────────────────────────
+-- user_id era uuid apontando para auth.users, que não é mais usado
+ALTER TABLE public.notifications DROP CONSTRAINT IF EXISTS notifications_user_id_fkey;
+ALTER TABLE public.notifications ALTER COLUMN user_id TYPE text USING user_id::text;
+ALTER TABLE public.notifications
+  ADD CONSTRAINT notifications_user_id_fkey
+  FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS notifications_user_idx ON public.notifications(user_id, created_at DESC);
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "rbw_read"   ON public.notifications;
+DROP POLICY IF EXISTS "rbw_insert" ON public.notifications;
+DROP POLICY IF EXISTS "rbw_update" ON public.notifications;
+DROP POLICY IF EXISTS "rbw_delete" ON public.notifications;
+
+-- Cada um lê e marca como lida só as suas. A inserção é liberada para
+-- qualquer sessão válida de propósito: é o que permite avisar OUTRA pessoa.
+CREATE POLICY "rbw_read" ON public.notifications FOR SELECT TO anon, authenticated
+  USING (user_id = public.rbw_user_id());
+CREATE POLICY "rbw_insert" ON public.notifications FOR INSERT TO anon, authenticated
+  WITH CHECK (public.rbw_user_id() IS NOT NULL);
+CREATE POLICY "rbw_update" ON public.notifications FOR UPDATE TO anon, authenticated
+  USING (user_id = public.rbw_user_id())
+  WITH CHECK (user_id = public.rbw_user_id());
+CREATE POLICY "rbw_delete" ON public.notifications FOR DELETE TO anon, authenticated
+  USING (user_id = public.rbw_user_id());
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.notifications TO anon, authenticated;
+GRANT USAGE, SELECT ON SEQUENCE public.notifications_id_seq TO anon, authenticated;
+
 -- ── Conteúdo do card: subtarefas e etiquetas ──────────────────
 CREATE TABLE IF NOT EXISTS public.task_checklist (
   id         bigserial PRIMARY KEY,

@@ -44,6 +44,10 @@ async function rpc(fn, args) {
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null)
   const [users, setUsers]             = useState([])
+  // `users` é a lista completa do painel de admin. `team` é a lista básica que
+  // todo mundo enxerga — sem ela, quem não é admin via o seletor de
+  // responsável vazio e não conseguia atribuir tarefa a ninguém.
+  const [team, setTeam]               = useState([])
   const [viewingAs, setViewingAs]     = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   // As policies do banco dependem do header x-rbw-token chegar ao servidor.
@@ -62,6 +66,7 @@ export function AuthProvider({ children }) {
         if (res.ok && res.user) {
           setCurrentUser(res.user)
           saveCache(res.user)
+          carregarEquipe(token)
         } else {
           // Sessão expirada ou revogada
           clearSession()
@@ -79,6 +84,12 @@ export function AuthProvider({ children }) {
   const profile       = currentUser
   const effectiveUser = viewingAs || profile
   const token         = () => localStorage.getItem(LS_TOKEN)
+
+  function carregarEquipe(t) {
+    rpc('rbw_team', { p_token: t })
+      .then(res => { if (res.ok && res.team) setTeam(res.team) })
+      .catch(() => {})
+  }
 
   // ── Login ────────────────────────────────────────────────────
   async function login(email, password) {
@@ -98,6 +109,7 @@ export function AuthProvider({ children }) {
       rpc('rbw_session', { p_token: res.token })
         .then(chk => setHeaderOk(chk.header_ok !== false))
         .catch(() => {})
+      carregarEquipe(res.token)
 
       return { ok: true }
     } catch (e) {
@@ -113,6 +125,7 @@ export function AuthProvider({ children }) {
     setCurrentUser(null)
     setViewingAs(null)
     setUsers([])
+    setTeam([])
     clearSession()
     if (t) rpc('rbw_logout', { p_token: t }).catch(() => {})
   }
@@ -199,6 +212,7 @@ export function AuthProvider({ children }) {
       profile,
       effectiveUser,
       users,
+      team,
       authLoading,
       headerOk,
       viewingAs,

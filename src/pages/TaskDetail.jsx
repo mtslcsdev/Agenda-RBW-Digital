@@ -205,7 +205,7 @@ export default function TaskDetail() {
   const match = useMatch('/tarefas/:id')
   const navigate = useNavigate()
   const { allTasks, allColumns, clients, editTask, activityLog, getTaskTotalTime } = useApp()
-  const { effectiveUser, users } = useAuth()
+  const { effectiveUser, team } = useAuth()
   const { canEdit } = usePermission()
   const overlayRef = useRef()
 
@@ -329,10 +329,17 @@ export default function TaskDetail() {
 
             <div style={{ marginBottom: '14px' }}>
               <strong style={rotulo}>RESPONSÁVEL</strong>
-              <select value={task.assigneeName || ''} disabled={!canEdit}
-                onChange={e => salvar({ assigneeName: e.target.value })} style={campo}>
+              <select
+                value={task.assignee_id || ''}
+                disabled={!canEdit}
+                onChange={e => salvar({
+                  assignee_id: e.target.value || null,
+                  assigneeName: team.find(u => u.id === e.target.value)?.name || '',
+                })}
+                style={campo}
+              >
                 <option value="">Ninguém</option>
-                {users.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+                {team.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </div>
 
