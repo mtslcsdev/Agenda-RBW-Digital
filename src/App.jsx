@@ -131,12 +131,33 @@ function AppLayout() {
   )
 }
 
+// As policies do banco identificam o usuário pelo header x-rbw-token. Se ele
+// não chegar ao servidor, as consultas voltam vazias — sem este aviso a tela
+// pareceria apenas "sem dados", que é o sintoma mais confuso possível.
+function SessionHeaderWarning() {
+  return (
+    <div style={{
+      background: '#fef3c7', color: '#92400e', padding: '10px 16px',
+      fontSize: '13px', lineHeight: 1.5, borderBottom: '1px solid #fcd34d',
+    }}>
+      ⚠️ <strong>Sessão não reconhecida pelo servidor.</strong> Os dados não vão
+      carregar até isso ser resolvido. Tente sair e entrar de novo — se
+      continuar, avise o suporte técnico.
+    </div>
+  )
+}
+
 function AuthGuard({ children }) {
-  const { currentUser, authLoading } = useAuth()
-  // Aguarda resolução da sessão Supabase antes de redirecionar
+  const { currentUser, authLoading, headerOk } = useAuth()
+  // Aguarda resolução da sessão antes de redirecionar
   if (authLoading) return <LoadingScreen />
   if (!currentUser) return <Login />
-  return <AppProvider>{children}</AppProvider>
+  return (
+    <AppProvider>
+      {!headerOk && <SessionHeaderWarning />}
+      {children}
+    </AppProvider>
+  )
 }
 
 export default function App() {

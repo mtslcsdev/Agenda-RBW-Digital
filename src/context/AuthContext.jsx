@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, LS_TOKEN } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
@@ -10,7 +10,6 @@ export const ROLES = {
   viewer:      { label: 'Viewer',      color: 'var(--text3)',   bg: 'var(--surface2)' },
 }
 
-const LS_TOKEN      = 'rbw_token_v4'
 const LS_USER_CACHE = 'rbw_user_v4'
 
 // Garante que nenhuma chamada ao Supabase trave a interface para sempre
@@ -47,6 +46,10 @@ export function AuthProvider({ children }) {
   const [users, setUsers]             = useState([])
   const [viewingAs, setViewingAs]     = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
+  // As policies do banco dependem do header x-rbw-token chegar ao servidor.
+  // Se por algum motivo ele não chegar, as tabelas voltam vazias — este sinal
+  // transforma essa falha silenciosa em um aviso visível.
+  const [headerOk, setHeaderOk]       = useState(true)
 
   // ── Restaura sessão ao abrir o app ───────────────────────────
   useEffect(() => {
@@ -55,6 +58,7 @@ export function AuthProvider({ children }) {
 
     rpc('rbw_session', { p_token: token })
       .then(res => {
+        if (res.header_ok === false) setHeaderOk(false)
         if (res.ok && res.user) {
           setCurrentUser(res.user)
           saveCache(res.user)
@@ -88,6 +92,13 @@ export function AuthProvider({ children }) {
       localStorage.setItem(LS_TOKEN, res.token)
       setCurrentUser(res.user)
       saveCache(res.user)
+
+      // Confere se o header de sessão chega ao servidor. Precisa ser depois de
+      // gravar o token, porque é o próprio fetch que o anexa.
+      rpc('rbw_session', { p_token: res.token })
+        .then(chk => setHeaderOk(chk.header_ok !== false))
+        .catch(() => {})
+
       return { ok: true }
     } catch (e) {
       if (e.message === 'timeout')
@@ -189,6 +200,7 @@ export function AuthProvider({ children }) {
       effectiveUser,
       users,
       authLoading,
+      headerOk,
       viewingAs,
       startViewingAs,
       stopViewingAs,

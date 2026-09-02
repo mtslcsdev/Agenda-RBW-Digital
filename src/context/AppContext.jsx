@@ -139,13 +139,30 @@ export function AppProvider({ children }) {
 
   // ── Carregamento em background ────────────────────────────────
   useEffect(() => {
-    loadAll().then(() => setupRealtime())
+    loadAll({ notify: true }).then(() => setupRealtime())
+
+    // O realtime do Supabase abre um socket próprio e não envia o header de
+    // sessão que as policies exigem, então ele pode não entregar eventos.
+    // Para o quadro não ficar defasado entre as pessoas, recarregamos quando a
+    // aba volta ao foco e periodicamente enquanto ela estiver visível.
+    function refresh() {
+      if (document.visibilityState === 'visible') loadAll()
+    }
+    const interval = setInterval(refresh, 45000)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+
     return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
       realtimeRef.current.forEach(ch => supabase.removeChannel(ch))
     }
   }, [])
 
-  async function loadAll() {
+  // `notify` só é ligado no primeiro carregamento — senão os avisos de prazo
+  // reapareceriam a cada recarga automática.
+  async function loadAll({ notify = false } = {}) {
     try {
       // Fase 1 — crítica (tasks, clients, notes)
       const [tRes, cRes, nRes] = await Promise.all([
@@ -159,10 +176,12 @@ export function AppProvider({ children }) {
 
       // Notificações de prazo ao carregar
       const today = new Date().toISOString().slice(0, 10)
-      const overdue  = tRes.data?.filter(t => t.date && t.date < today && !t.done) || []
-      const dueToday = tRes.data?.filter(t => t.date === today && !t.done) || []
-      if (overdue.length)   _notify('⚠️', `${overdue.length} tarefa${overdue.length > 1 ? 's' : ''} em atraso!`, 'overdue')
-      if (dueToday.length)  _notify('📅', `${dueToday.length} tarefa${dueToday.length > 1 ? 's' : ''} vencem hoje!`, 'deadline')
+      if (notify) {
+        const overdue  = tRes.data?.filter(t => t.date && t.date < today && !t.done) || []
+        const dueToday = tRes.data?.filter(t => t.date === today && !t.done) || []
+        if (overdue.length)   _notify('⚠️', `${overdue.length} tarefa${overdue.length > 1 ? 's' : ''} em atraso!`, 'overdue')
+        if (dueToday.length)  _notify('📅', `${dueToday.length} tarefa${dueToday.length > 1 ? 's' : ''} vencem hoje!`, 'deadline')
+      }
 
       // Fase 2 — background (comments, activity, time)
       const [cmRes, aRes, eRes] = await Promise.all([
