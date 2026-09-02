@@ -111,6 +111,7 @@ const mapComment = r => ({
 const mapActivity = r => ({
   id: r.id, userName: r.user_name, userColor: r.user_color,
   action: r.action, entityType: r.entity_type, entityTitle: r.entity_title,
+  entityId: r.entity_id ?? null,
   createdAt: r.created_at,
 })
 const mapNotification = r => ({
@@ -401,12 +402,15 @@ export function AppProvider({ children }) {
     }
   }, [usuarioId])
 
-  const _log = useCallback((actor, action, entityType, entityTitle) => {
+  // entityId liga o registro à entidade. Sem ele o histórico era casado pelo
+  // título, e duas tarefas de mesmo nome apareciam misturadas.
+  const _log = useCallback((actor, action, entityType, entityTitle, entityId = null) => {
     const entry = {
       id: Date.now() + Math.random(),
       userName: actor?.name || 'Sistema',
       userColor: actor?.color || '#6B6960',
       action, entityType, entityTitle,
+      entityId: entityId != null ? String(entityId) : null,
       createdAt: new Date().toISOString(),
     }
     setActivityLog(prev => [entry, ...prev].slice(0, 50))
@@ -415,6 +419,7 @@ export function AppProvider({ children }) {
       user_id: actor?.id, user_name: actor?.name || 'Sistema',
       user_color: actor?.color || '#6B6960',
       action, entity_type: entityType, entity_title: entityTitle,
+      entity_id: entityId != null ? String(entityId) : null,
     }).then(() => {})
   }, [])
 
@@ -439,7 +444,7 @@ export function AppProvider({ children }) {
       .select().single()
     if (row) setTasksState(prev => prev.map(t => t.id === tmp.id ? mapTask(row) : t))
     _notify('✅', `Nova tarefa: ${data.title}`, 'task.created')
-    if (actor) _log(actor, 'criou a tarefa', 'tarefa', data.title)
+    if (actor) _log(actor, 'criou a tarefa', 'tarefa', data.title, row?.id)
   }
 
   async function editTask(id, data, actor) {
@@ -449,7 +454,7 @@ export function AppProvider({ children }) {
     const atual = tasks.find(t => t.id === id)
     setTasksState(prev => prev.map(t => t.id === id ? { ...t, ...data } : t))
     await supabase.from('tasks').update(taskRow({ ...atual, ...data })).eq('id', id)
-    if (actor) _log(actor, 'editou a tarefa', 'tarefa', data.title || atual?.title || '')
+    if (actor) _log(actor, 'editou a tarefa', 'tarefa', data.title || atual?.title || '', id)
   }
 
   async function deleteTask(id, actor) {
@@ -457,7 +462,7 @@ export function AppProvider({ children }) {
     setTasksState(prev => prev.filter(t => t.id !== id))
     setCommentsState(prev => { const c = { ...prev }; delete c[id]; return c })
     await supabase.from('tasks').delete().eq('id', id)
-    if (actor && task) _log(actor, 'removeu a tarefa', 'tarefa', task.title)
+    if (actor && task) _log(actor, 'removeu a tarefa', 'tarefa', task.title, id)
   }
 
   // Posição para inserir no topo de uma coluna
@@ -485,7 +490,7 @@ export function AppProvider({ children }) {
 
     if (actor) {
       _notify(done ? '🏁' : '↩', done ? `Concluída: ${task.title}` : `Reaberta: ${task.title}`, done ? 'task.done' : 'task.reopened')
-      _log(actor, done ? 'concluiu a tarefa' : 'reabriu a tarefa', 'tarefa', task.title)
+      _log(actor, done ? 'concluiu a tarefa' : 'reabriu a tarefa', 'tarefa', task.title, id)
     }
   }
 
@@ -516,7 +521,7 @@ export function AppProvider({ children }) {
 
     if (actor && col && mudouCol) {
       _notify('🔀', `Movida para ${col.label}: ${task.title}`, 'task.moved')
-      _log(actor, `moveu para ${col.label}`, 'tarefa', task.title)
+      _log(actor, `moveu para ${col.label}`, 'tarefa', task.title, id)
     }
   }
 

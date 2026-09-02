@@ -486,7 +486,7 @@ function BoardSelector() {
 // ── Quadro ─────────────────────────────────────────────────────
 
 export default function KanbanBoard({ tasks, onNew, onEdit, clientFilter, onClientFilterChange, clients }) {
-  const { columns, moveTask, reorderColumn, currentBoardId } = useApp()
+  const { columns, moveTask, reorderColumn, currentBoardId, tasks: todasAsTarefas } = useApp()
   const { effectiveUser } = useAuth()
   const { canEdit } = usePermission()
   const navigate = useNavigate()
@@ -501,8 +501,14 @@ export default function KanbanBoard({ tasks, onNew, onEdit, clientFilter, onClie
   // arquivada caem na primeira, para nenhum card sumir da vista.
   const doQuadro = tasks.filter(t => t.boardId === currentBoardId)
 
-  function cardsDaColuna(colId, isPrimeira) {
-    return doQuadro
+  // Para calcular a posição de destino usamos TODAS as tarefas do quadro, não
+  // só as visíveis: com um filtro ativo, medir a posição apenas entre os cards
+  // à vista ignora os escondidos entre eles, e o card pularia de lugar assim
+  // que o filtro fosse limpo.
+  const todasDoQuadro = todasAsTarefas.filter(t => t.boardId === currentBoardId)
+
+  function cardsDaColuna(colId, isPrimeira, lista = doQuadro) {
+    return lista
       .filter(t => t.columnId === colId || (isPrimeira && !columns.some(c => c.id === t.columnId)))
       .sort((a, b) => a.position - b.position)
   }
@@ -526,7 +532,7 @@ export default function KanbanBoard({ tasks, onNew, onEdit, clientFilter, onClie
     if (destColId == null) return
 
     const primeiraId = columns[0]?.id
-    const lista = cardsDaColuna(destColId, destColId === primeiraId)
+    const lista = cardsDaColuna(destColId, destColId === primeiraId, todasDoQuadro)
 
     // Reproduz o resultado visual do dnd-kit para achar os vizinhos finais
     let resultado

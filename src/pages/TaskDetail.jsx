@@ -159,7 +159,14 @@ function Etiquetas({ taskId }) {
                 }}>{l.name}</span>
                 <button className="btn-icon"
                   style={{ width: '20px', height: '20px', fontSize: '10px', color: 'var(--red)' }}
-                  onClick={() => deleteLabel(l.id)} title="Excluir etiqueta">✕</button>
+                  onClick={() => {
+                    // Apagar aqui remove a etiqueta do sistema inteiro, não só
+                    // deste card — vale avisar antes.
+                    if (window.confirm(`Excluir a etiqueta "${l.name}" de TODOS os cards? Para tirá-la só desta tarefa, basta desmarcar.`)) {
+                      deleteLabel(l.id)
+                    }
+                  }}
+                  title="Excluir etiqueta de todos os cards">✕</button>
               </div>
             )
           })}
@@ -250,7 +257,13 @@ export default function TaskDetail() {
   // opções de coluna vêm do quadro da própria tarefa.
   const columns = allColumns.filter(c => c.boardId === task.boardId)
   const rel = dataRelativa(task.date)
-  const historico = activityLog.filter(a => a.entityTitle === task.title).slice(0, 8)
+  // Registros anteriores ao entity_id não têm id; para esses o título ainda é
+  // o único vínculo disponível.
+  const historico = activityLog
+    .filter(a => a.entityId
+      ? String(a.entityId) === String(task.id)
+      : a.entityTitle === task.title)
+    .slice(0, 8)
   const tempo = getTaskTotalTime(task.id)
 
   function salvar(patch) { editTask(task.id, patch, effectiveUser) }
