@@ -49,7 +49,9 @@ export default function ClientDetail({ onNewTask, onEditTask, onEditClient }) {
     )
   }
 
-  const clientTasks = tasks.filter(t => t.client === client.name)
+  // Prefere a ligação por id; o nome só é usado para tarefas antigas sem vínculo
+  const clientTasks = tasks.filter(t =>
+    t.client_id ? t.client_id === client.id : t.client === client.name)
   const clientDocs = docs.filter(d => d.clientId === String(client.id))
   const clientFolder = folders.find(f => f.clientId === String(client.id))
 

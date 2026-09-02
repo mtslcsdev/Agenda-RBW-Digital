@@ -12,6 +12,15 @@ function toInputDate(iso) {
   return ''
 }
 
+// O select de cliente devolve o id de um cliente real, a categoria "Pessoal"
+// ou vazio. Só o id é uma ligação de verdade; o resto continua como texto.
+function resolverCliente(valor) {
+  if (!valor) return { client_id: null, client: '' }
+  const id = Number(valor)
+  if (Number.isFinite(id) && id > 0) return { client_id: id, client: '' }
+  return { client_id: null, client: String(valor) }
+}
+
 export default function TaskModal({ open, onClose, editingTask = null, preset = null }) {
   const { clients, addTask, editTask, columns } = useApp()
   const { profile, users, effectiveUser } = useAuth()
@@ -39,7 +48,7 @@ export default function TaskModal({ open, onClose, editingTask = null, preset = 
     const coluna = columns.find(c => c.id === columnId)
     const data = {
       title: fd.get('title'),
-      client: fd.get('client'),
+      ...resolverCliente(fd.get('client')),
       date: fd.get('date') || null,
       priority: fd.get('priority'),
       notes: fd.get('notes'),
@@ -84,8 +93,15 @@ export default function TaskModal({ open, onClose, editingTask = null, preset = 
           <div className="form-row">
             <div className="form-group">
               <label>CLIENTE / PROJETO</label>
-              <select name="client" defaultValue={editingTask?.client || ''} key={editingTask?.id ?? 'new-client'}>
-                {clients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              {/* O valor gravado é o id do cliente; "Pessoal" é uma categoria,
+                  não um cliente, então continua sendo guardado como texto. */}
+              <select
+                name="client"
+                defaultValue={editingTask?.client_id ? String(editingTask.client_id) : (editingTask?.client || '')}
+                key={editingTask?.id ?? 'new-client'}
+              >
+                <option value="">— Nenhum —</option>
+                {clients.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
                 <option value="Pessoal">Pessoal</option>
               </select>
             </div>

@@ -358,10 +358,21 @@ export default function TaskDetail() {
 
             <div style={{ marginBottom: '14px' }}>
               <strong style={rotulo}>CLIENTE</strong>
-              <select value={task.client || ''} disabled={!canEdit}
-                onChange={e => salvar({ client: e.target.value })} style={campo}>
+              <select
+                value={task.client_id ? String(task.client_id) : (task.client || '')}
+                disabled={!canEdit}
+                onChange={e => {
+                  const v = e.target.value
+                  const id = Number(v)
+                  salvar(Number.isFinite(id) && id > 0
+                    ? { client_id: id, client: '' }
+                    : { client_id: null, client: v })
+                }}
+                style={campo}
+              >
                 <option value="">Nenhum</option>
-                {clients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                {clients.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                <option value="Pessoal">Pessoal</option>
               </select>
             </div>
 

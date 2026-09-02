@@ -107,7 +107,12 @@ const mapDoc = r => ({
 
 // ── Mappers App → DB ──────────────────────────────────────────
 const taskRow = t => ({
-  title: t.title, client: t.client || '', client_id: t.client_id || null,
+  title: t.title,
+  // Com vínculo por id o nome não é guardado: seria uma cópia que envelhece
+  // sozinha quando o cliente é renomeado. O texto só sobrevive para valores
+  // que não são um cliente de verdade, como "Pessoal".
+  client: t.client_id ? '' : (t.client || ''),
+  client_id: t.client_id || null,
   tag: t.tag || '', tag_color: t.tagColor || 'green',
   priority: t.priority || 'Normal', date: t.date || '',
   notes: t.notes || '', done: t.done || false,
@@ -820,8 +825,16 @@ export function AppProvider({ children }) {
   const activeClients   = clients.filter(c => !c.archived && !c.hidden)
   const hiddenClients   = clients.filter(c => c.hidden && !c.archived)
   const archivedClients = clients.filter(c => c.archived)
-  const activeTasks     = tasks.filter(t => !t.archived)
-  const archivedTasks   = tasks.filter(t => t.archived)
+  // O nome do cliente exibido é derivado de client_id, não guardado na tarefa:
+  // assim renomear um cliente atualiza as tarefas dele em vez de órfãs-las.
+  // O texto antigo continua servindo de reserva para valores que não são um
+  // cliente de verdade — "Pessoal", por exemplo, é uma categoria.
+  const comCliente = tasks.map(t => {
+    const c = t.client_id ? clients.find(cl => cl.id === t.client_id) : null
+    return c ? { ...t, client: c.name } : t
+  })
+  const activeTasks     = comCliente.filter(t => !t.archived)
+  const archivedTasks   = comCliente.filter(t => t.archived)
   const activeNotes     = notes.filter(n => !n.archived)
   const archivedNotes   = notes.filter(n => n.archived)
   const unreadCount     = notifications.filter(n => !n.read).length
@@ -830,7 +843,7 @@ export function AppProvider({ children }) {
     <AppContext.Provider value={{
       appLoading,
       theme, toggleTheme,
-      tasks: activeTasks, allTasks: tasks, archivedTasks,
+      tasks: activeTasks, allTasks: comCliente, archivedTasks,
       addTask, editTask, deleteTask, toggleTask, moveTask, archiveTask,
       columns, addColumn, updateColumn, moveColumn, archiveColumn, reorderColumn,
       getChecklist, checklistProgress, addChecklistItem, toggleChecklistItem, deleteChecklistItem,

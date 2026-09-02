@@ -10,7 +10,8 @@ export default function Relatorio() {
   const { clients, tasks, notes, columns } = useApp()
 
   const client = clients.find(c => clientSlug(c.name) === clientId)
-  const clientTasks = tasks.filter(t => t.client === client?.name)
+  const clientTasks = tasks.filter(t =>
+    t.client_id ? t.client_id === client?.id : t.client === client?.name)
   const clientNotes = notes.filter(n => n.project === client?.name)
 
   // Mesmo critério do Dashboard: as colunas são configuráveis, então o status
