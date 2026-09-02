@@ -204,7 +204,7 @@ const campo = {
 export default function TaskDetail() {
   const match = useMatch('/tarefas/:id')
   const navigate = useNavigate()
-  const { allTasks, columns, clients, editTask, activityLog, getTaskTotalTime } = useApp()
+  const { allTasks, allColumns, clients, editTask, activityLog, getTaskTotalTime } = useApp()
   const { effectiveUser, users } = useAuth()
   const { canEdit } = usePermission()
   const overlayRef = useRef()
@@ -246,6 +246,9 @@ export default function TaskDetail() {
     )
   }
 
+  // O card aberto pode ser de outro quadro (link direto, busca), então as
+  // opções de coluna vêm do quadro da própria tarefa.
+  const columns = allColumns.filter(c => c.boardId === task.boardId)
   const rel = dataRelativa(task.date)
   const historico = activityLog.filter(a => a.entityTitle === task.title).slice(0, 8)
   const tempo = getTaskTotalTime(task.id)

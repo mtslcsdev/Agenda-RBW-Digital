@@ -109,6 +109,50 @@ END $$;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.board_columns TO anon, authenticated;
 GRANT USAGE, SELECT ON SEQUENCE public.board_columns_id_seq TO anon, authenticated;
 
+-- ── Quadros (um interno da equipe + um por cliente) ───────────
+CREATE TABLE IF NOT EXISTS public.boards (
+  id         bigserial PRIMARY KEY,
+  name       text    NOT NULL,
+  client_id  bigint  REFERENCES public.clients(id) ON DELETE CASCADE,
+  position   numeric NOT NULL DEFAULT 1000,
+  archived   boolean NOT NULL DEFAULT false,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Colunas pertencem a um quadro; apagar o quadro leva as colunas junto.
+-- As tarefas ficam com board_id nulo em vez de sumirem.
+ALTER TABLE public.board_columns
+  ADD COLUMN IF NOT EXISTS board_id bigint REFERENCES public.boards(id) ON DELETE CASCADE;
+ALTER TABLE public.tasks
+  ADD COLUMN IF NOT EXISTS board_id bigint REFERENCES public.boards(id) ON DELETE SET NULL;
+
+INSERT INTO public.boards (name, client_id, position)
+SELECT 'Equipe RBW', NULL, 1000
+WHERE NOT EXISTS (SELECT 1 FROM public.boards);
+
+UPDATE public.board_columns SET board_id = (SELECT id FROM public.boards ORDER BY id LIMIT 1)
+WHERE board_id IS NULL;
+UPDATE public.tasks SET board_id = (SELECT id FROM public.boards ORDER BY id LIMIT 1)
+WHERE board_id IS NULL;
+
+ALTER TABLE public.boards ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "rbw_read"   ON public.boards;
+DROP POLICY IF EXISTS "rbw_insert" ON public.boards;
+DROP POLICY IF EXISTS "rbw_update" ON public.boards;
+DROP POLICY IF EXISTS "rbw_delete" ON public.boards;
+CREATE POLICY "rbw_read" ON public.boards FOR SELECT TO anon, authenticated
+  USING (public.rbw_role() IS NOT NULL);
+CREATE POLICY "rbw_insert" ON public.boards FOR INSERT TO anon, authenticated
+  WITH CHECK (public.rbw_role() IN ('editor','admin','super_admin'));
+CREATE POLICY "rbw_update" ON public.boards FOR UPDATE TO anon, authenticated
+  USING (public.rbw_role() IN ('editor','admin','super_admin'))
+  WITH CHECK (public.rbw_role() IN ('editor','admin','super_admin'));
+CREATE POLICY "rbw_delete" ON public.boards FOR DELETE TO anon, authenticated
+  USING (public.rbw_role() IN ('admin','super_admin'));
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.boards TO anon, authenticated;
+GRANT USAGE, SELECT ON SEQUENCE public.boards_id_seq TO anon, authenticated;
+
 -- ── Conteúdo do card: subtarefas e etiquetas ──────────────────
 CREATE TABLE IF NOT EXISTS public.task_checklist (
   id         bigserial PRIMARY KEY,

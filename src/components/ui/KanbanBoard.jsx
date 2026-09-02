@@ -377,10 +377,116 @@ function AddColumn() {
   )
 }
 
+// ── Seletor de quadros ─────────────────────────────────────────
+
+function BoardSelector() {
+  const { boards, currentBoardId, setCurrentBoard, addBoard, renameBoard, archiveBoard, clients } = useApp()
+  const { canEdit } = usePermission()
+  const [criando, setCriando] = useState(false)
+  const [nome, setNome] = useState('')
+  const [clienteId, setClienteId] = useState('')
+  const [erro, setErro] = useState('')
+
+  const atual = boards.find(b => b.id === currentBoardId)
+
+  async function criar() {
+    const res = await addBoard(nome, clienteId ? Number(clienteId) : null)
+    if (!res.ok) { setErro(res.error); return }
+    setNome(''); setClienteId(''); setErro(''); setCriando(false)
+  }
+
+  async function renomear() {
+    const novo = window.prompt('Novo nome do quadro:', atual?.name || '')
+    if (novo === null) return
+    const res = await renameBoard(currentBoardId, novo)
+    if (!res.ok) setErro(res.error)
+  }
+
+  async function arquivar() {
+    if (!window.confirm(`Arquivar o quadro "${atual?.name}"? As tarefas continuam no banco, mas somem da vista.`)) return
+    const res = await archiveBoard(currentBoardId)
+    if (!res.ok) setErro(res.error)
+  }
+
+  return (
+    <div style={{ marginBottom: '14px' }}>
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: '12px', color: 'var(--text3)', marginRight: '2px' }}>Quadro:</span>
+        {boards.map(b => {
+          const ativo = b.id === currentBoardId
+          const cliente = b.clientId ? clients.find(c => c.id === b.clientId) : null
+          return (
+            <button
+              key={b.id}
+              onClick={() => setCurrentBoard(b.id)}
+              style={{
+                cursor: 'pointer', padding: '5px 12px', fontSize: '12px', fontWeight: 600,
+                borderRadius: '7px', fontFamily: 'inherit',
+                border: `1px solid ${ativo ? 'var(--accent)' : 'var(--border)'}`,
+                background: ativo ? 'var(--accent-light)' : 'transparent',
+                color: ativo ? 'var(--accent)' : 'var(--text2)',
+              }}
+            >
+              {cliente ? `👤 ${b.name}` : b.name}
+            </button>
+          )
+        })}
+
+        {canEdit && (
+          <button className="btn btn-ghost" style={{ fontSize: '11px', padding: '5px 10px' }}
+            onClick={() => setCriando(c => !c)}>{criando ? 'Cancelar' : '+ Novo quadro'}</button>
+        )}
+        {canEdit && atual && (
+          <>
+            <button className="btn-icon" style={{ width: '24px', height: '24px', fontSize: '11px', color: 'var(--text3)' }}
+              onClick={renomear} title="Renomear quadro">✏️</button>
+            <button className="btn-icon" style={{ width: '24px', height: '24px', fontSize: '11px', color: 'var(--red)' }}
+              onClick={arquivar} title="Arquivar quadro">🗄</button>
+          </>
+        )}
+      </div>
+
+      {criando && canEdit && (
+        <div style={{
+          display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap', alignItems: 'center',
+          padding: '10px', border: '1px solid var(--border)', borderRadius: '8px',
+          background: 'var(--surface2)',
+        }}>
+          <input
+            value={nome} autoFocus
+            onChange={e => { setNome(e.target.value); setErro('') }}
+            onKeyDown={e => e.key === 'Enter' && criar()}
+            placeholder="Nome do quadro"
+            style={{
+              flex: '1 1 180px', fontSize: '12px', padding: '6px 8px',
+              border: `1px solid ${erro ? 'var(--red)' : 'var(--border)'}`,
+              borderRadius: '6px', background: 'var(--surface)', color: 'var(--text)',
+            }}
+          />
+          <select
+            value={clienteId}
+            onChange={e => setClienteId(e.target.value)}
+            style={{
+              fontSize: '12px', padding: '6px 8px', border: '1px solid var(--border)',
+              borderRadius: '6px', background: 'var(--surface)', color: 'var(--text)',
+            }}
+          >
+            <option value="">Quadro interno</option>
+            {clients.map(c => <option key={c.id} value={String(c.id)}>Cliente: {c.name}</option>)}
+          </select>
+          <button className="btn btn-primary" style={{ fontSize: '11px' }} onClick={criar}>Criar</button>
+        </div>
+      )}
+
+      {erro && <div style={{ fontSize: '11px', color: 'var(--red)', marginTop: '6px' }}>{erro}</div>}
+    </div>
+  )
+}
+
 // ── Quadro ─────────────────────────────────────────────────────
 
 export default function KanbanBoard({ tasks, onNew, onEdit, clientFilter, onClientFilterChange, clients }) {
-  const { columns, moveTask, reorderColumn } = useApp()
+  const { columns, moveTask, reorderColumn, currentBoardId } = useApp()
   const { effectiveUser } = useAuth()
   const { canEdit } = usePermission()
   const navigate = useNavigate()
@@ -390,10 +496,13 @@ export default function KanbanBoard({ tasks, onNew, onEdit, clientFilter, onClie
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
 
-  // As tarefas já chegam filtradas pela página; aqui só agrupamos por coluna.
-  // Tarefas cuja coluna foi removida caem na primeira, para nenhum card sumir.
+  // As tarefas já chegam filtradas pela página; aqui restringimos ao quadro
+  // aberto e agrupamos por coluna. Tarefas deste quadro cuja coluna foi
+  // arquivada caem na primeira, para nenhum card sumir da vista.
+  const doQuadro = tasks.filter(t => t.boardId === currentBoardId)
+
   function cardsDaColuna(colId, isPrimeira) {
-    return tasks
+    return doQuadro
       .filter(t => t.columnId === colId || (isPrimeira && !columns.some(c => c.id === t.columnId)))
       .sort((a, b) => a.position - b.position)
   }
@@ -460,6 +569,8 @@ export default function KanbanBoard({ tasks, onNew, onEdit, clientFilter, onClie
 
   return (
     <div>
+      <BoardSelector />
+
       {/* Filtro por cliente */}
       {clients && clients.length > 0 && (
         <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap', alignItems: 'center' }}>

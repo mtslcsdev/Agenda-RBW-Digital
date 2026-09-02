@@ -40,6 +40,7 @@ const mapTask = r => ({
   done: r.done || false,
   taskStatus: r.task_status || 'pendente',
   columnId: r.column_id ?? null,
+  boardId: r.board_id ?? null,
   position: r.position != null ? Number(r.position) : 0,
   archived: r.archived || false,
   assigneeName: r.assignee_name || '',
@@ -63,10 +64,18 @@ const mapNote = r => ({
 })
 const mapColumn = r => ({
   id: r.id,
+  boardId: r.board_id ?? null,
   label: r.label,
   color: r.color || '#6B6960',
   position: Number(r.position),
   isDone: r.is_done || false,
+  archived: r.archived || false,
+})
+const mapBoard = r => ({
+  id: r.id,
+  name: r.name,
+  clientId: r.client_id ?? null,
+  position: Number(r.position),
   archived: r.archived || false,
 })
 const mapChecklistItem = r => ({
@@ -118,6 +127,7 @@ const taskRow = t => ({
   notes: t.notes || '', done: t.done || false,
   task_status: t.taskStatus || 'pendente',
   column_id: t.columnId ?? null,
+  board_id: t.boardId ?? null,
   position: t.position ?? 1000,
   assignee_name: t.assigneeName || '', assignee_id: t.assignee_id || null,
 })
@@ -147,6 +157,11 @@ export function AppProvider({ children }) {
   const [docs, setDocsState]              = useState([])
   const [folders, setFoldersState]        = useState([])
   const [columns, setColumnsState]        = useState([])
+  const [boards, setBoardsState]          = useState([])
+  const [currentBoardId, setBoardId]      = useState(() => {
+    const salvo = Number(localStorage.getItem('rbw_board'))
+    return Number.isFinite(salvo) && salvo > 0 ? salvo : null
+  })
   const [checklists, setChecklists]       = useState({})   // taskId -> itens
   const [labels, setLabelsState]          = useState([])
   const [taskLabels, setTaskLabels]       = useState({})   // taskId -> [labelId]
@@ -165,6 +180,10 @@ export function AppProvider({ children }) {
   useEffect(() => {
     localStorage.setItem('fd_activeTimer', JSON.stringify(activeTimer))
   }, [activeTimer])
+
+  useEffect(() => {
+    if (currentBoardId) localStorage.setItem('rbw_board', String(currentBoardId))
+  }, [currentBoardId])
 
   // ── Carregamento em background ────────────────────────────────
   useEffect(() => {
@@ -194,12 +213,19 @@ export function AppProvider({ children }) {
   async function loadAll({ notify = false } = {}) {
     try {
       // Fase 1 — crítica (colunas, tasks, clients, notes)
-      const [colRes, tRes, cRes, nRes] = await Promise.all([
+      const [bRes, colRes, tRes, cRes, nRes] = await Promise.all([
+        supabase.from('boards').select('*').eq('archived', false).order('position'),
         supabase.from('board_columns').select('*').eq('archived', false).order('position'),
         supabase.from('tasks').select('*').order('created_at', { ascending: false }),
         supabase.from('clients').select('*').order('created_at', { ascending: false }),
         supabase.from('notes').select('*').order('pinned', { ascending: false }).order('created_at', { ascending: false }),
       ])
+      if (bRes.data) {
+        const lista = bRes.data.map(mapBoard)
+        setBoardsState(lista)
+        // Se o quadro salvo sumiu (ou é o primeiro acesso), cai no primeiro
+        setBoardId(atual => lista.some(b => b.id === atual) ? atual : (lista[0]?.id ?? null))
+      }
       if (colRes.data) setColumnsState(colRes.data.map(mapColumn))
       if (tRes.data) setTasksState(tRes.data.map(mapTask))
       if (cRes.data) setClientsState(cRes.data.map(mapClient))
@@ -345,12 +371,15 @@ export function AppProvider({ children }) {
 
   // ── TASKS ─────────────────────────────────────────────────────
   async function addTask(data, actor) {
-    const columnId = data.columnId ?? columns[0]?.id ?? null
+    const boardId  = data.boardId ?? currentBoardId
+    const doQuadro = columns.filter(c => c.boardId === boardId)
+    const columnId = data.columnId ?? doQuadro[0]?.id ?? null
     const tmp = {
       ...data,
       id: 'tmp-' + Date.now(),
       done: false,
       taskStatus: data.taskStatus || 'pendente',
+      boardId,
       columnId,
       position: posicaoNoTopo(columnId),
     }
@@ -395,7 +424,8 @@ export function AppProvider({ children }) {
     const done = !task.done
     // Concluir move o card para a coluna marcada como "concluído"; reabrir
     // devolve para a primeira coluna que não seja de conclusão.
-    const alvo = columns.find(c => (done ? c.isDone : !c.isDone))
+    const alvo = columns.find(c =>
+      c.boardId === task.boardId && (done ? c.isDone : !c.isDone))
 
     if (alvo && alvo.id !== task.columnId) {
       await moveTask(id, alvo.id, posicaoNoTopo(alvo.id), null)
@@ -468,13 +498,16 @@ export function AppProvider({ children }) {
     const nome = (label || '').trim()
     if (!nome) return { ok: false, error: 'Dê um nome à coluna.' }
 
-    const position = columns.length
-      ? Math.max(...columns.map(c => c.position)) + POSITION_GAP
+    const doQuadro = columns.filter(c => c.boardId === currentBoardId)
+    const position = doQuadro.length
+      ? Math.max(...doQuadro.map(c => c.position)) + POSITION_GAP
       : POSITION_GAP
-    const color = COLUMN_COLORS[columns.length % COLUMN_COLORS.length]
+    const color = COLUMN_COLORS[doQuadro.length % COLUMN_COLORS.length]
 
     const { data: row, error } = await supabase
-      .from('board_columns').insert({ label: nome, color, position }).select().single()
+      .from('board_columns')
+      .insert({ label: nome, color, position, board_id: currentBoardId })
+      .select().single()
     if (error) return { ok: false, error: error.message }
 
     setColumnsState(prev => ordenarColunas([...prev, mapColumn(row)]))
@@ -506,7 +539,8 @@ export function AppProvider({ children }) {
 
   // Reordena colunas pelo índice de destino, usando a média entre as vizinhas.
   async function moveColumn(id, novoIndice) {
-    const restantes = columns.filter(c => c.id !== id)
+    const boardId = columns.find(c => c.id === id)?.boardId
+    const restantes = columns.filter(c => c.id !== id && c.boardId === boardId)
     const antes = restantes[novoIndice - 1]
     const depois = restantes[novoIndice]
     let position
@@ -519,7 +553,8 @@ export function AppProvider({ children }) {
 
   // Arquivar não pode engolir tarefas: elas vão para a primeira coluna restante.
   async function archiveColumn(id) {
-    const destino = columns.find(c => c.id !== id)
+    const boardId = columns.find(c => c.id === id)?.boardId
+    const destino = columns.find(c => c.id !== id && c.boardId === boardId)
     if (!destino) return { ok: false, error: 'O quadro precisa de ao menos uma coluna.' }
 
     const orfas = tasks.filter(t => t.columnId === id)
@@ -540,6 +575,59 @@ export function AppProvider({ children }) {
     const { error } = await supabase.from('board_columns').update({ archived: true }).eq('id', id)
     if (error) return { ok: false, error: error.message }
     setColumnsState(prev => prev.filter(c => c.id !== id))
+    return { ok: true }
+  }
+
+  // ── QUADROS ───────────────────────────────────────────────────
+  const COLUNAS_PADRAO = [
+    { label: 'Pendente',     color: '#6B6960', is_done: false },
+    { label: 'Em Progresso', color: '#E07A3A', is_done: false },
+    { label: 'Concluído',    color: '#2D6A4F', is_done: true  },
+  ]
+
+  async function addBoard(name, clientId = null) {
+    const nome = (name || '').trim()
+    if (!nome) return { ok: false, error: 'Dê um nome ao quadro.' }
+
+    const position = boards.length
+      ? Math.max(...boards.map(b => b.position)) + POSITION_GAP
+      : POSITION_GAP
+
+    const { data: row, error } = await supabase
+      .from('boards').insert({ name: nome, client_id: clientId, position }).select().single()
+    if (error) return { ok: false, error: error.message }
+
+    // Um quadro sem colunas não serve para nada — já nasce com as três padrão
+    const { data: cols } = await supabase.from('board_columns').insert(
+      COLUNAS_PADRAO.map((c, i) => ({ ...c, position: (i + 1) * POSITION_GAP, board_id: row.id }))
+    ).select()
+
+    setBoardsState(prev => [...prev, mapBoard(row)].sort((a, b) => a.position - b.position))
+    if (cols) setColumnsState(prev => [...prev, ...cols.map(mapColumn)])
+    setBoardId(row.id)
+    return { ok: true, board: mapBoard(row) }
+  }
+
+  async function renameBoard(id, name) {
+    const nome = (name || '').trim()
+    if (!nome) return { ok: false, error: 'O nome não pode ficar vazio.' }
+    const anterior = boards.find(b => b.id === id)
+    setBoardsState(prev => prev.map(b => b.id === id ? { ...b, name: nome } : b))
+    const { error } = await supabase.from('boards').update({ name: nome }).eq('id', id)
+    if (error) {
+      setBoardsState(prev => prev.map(b => b.id === id ? anterior : b))
+      return { ok: false, error: error.message }
+    }
+    return { ok: true }
+  }
+
+  async function archiveBoard(id) {
+    if (boards.length <= 1) return { ok: false, error: 'É preciso ter ao menos um quadro.' }
+    const { error } = await supabase.from('boards').update({ archived: true }).eq('id', id)
+    if (error) return { ok: false, error: error.message }
+    const restantes = boards.filter(b => b.id !== id)
+    setBoardsState(restantes)
+    if (currentBoardId === id) setBoardId(restantes[0]?.id ?? null)
     return { ok: true }
   }
 
@@ -845,7 +933,13 @@ export function AppProvider({ children }) {
       theme, toggleTheme,
       tasks: activeTasks, allTasks: comCliente, archivedTasks,
       addTask, editTask, deleteTask, toggleTask, moveTask, archiveTask,
-      columns, addColumn, updateColumn, moveColumn, archiveColumn, reorderColumn,
+      // `columns` é sempre o do quadro aberto; `allColumns` serve para telas
+      // que somam tarefas de todos os quadros (Dashboard, Relatório).
+      columns: columns.filter(c => c.boardId === currentBoardId),
+      allColumns: columns,
+      addColumn, updateColumn, moveColumn, archiveColumn, reorderColumn,
+      boards, currentBoardId, setCurrentBoard: setBoardId,
+      addBoard, renameBoard, archiveBoard,
       getChecklist, checklistProgress, addChecklistItem, toggleChecklistItem, deleteChecklistItem,
       labels, getTaskLabels, toggleTaskLabel, addLabel, deleteLabel,
       clients: activeClients, allClients: clients, hiddenClients, archivedClients,

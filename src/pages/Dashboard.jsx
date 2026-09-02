@@ -13,7 +13,8 @@ const scheduleItems = [
 ]
 
 export default function Dashboard({ onNewTask, onEditTask }) {
-  const { tasks, toggleTask, deleteTask, clients, columns } = useApp()
+  // allColumns: o resumo cobre tarefas de todos os quadros, não só do aberto
+  const { tasks, toggleTask, deleteTask, clients, allColumns: columns } = useApp()
   const navigate = useNavigate()
 
   const today = new Date().toISOString().slice(0, 10)

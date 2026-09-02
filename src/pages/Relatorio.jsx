@@ -7,7 +7,7 @@ const PRIORITY_LABELS = { Normal: 'Normal', Alta: 'Alta', Urgente: 'Urgente' }
 export default function Relatorio() {
   const { clientId } = useParams()
   const navigate = useNavigate()
-  const { clients, tasks, notes, columns } = useApp()
+  const { clients, tasks, notes, allColumns: columns } = useApp()
 
   const client = clients.find(c => clientSlug(c.name) === clientId)
   const clientTasks = tasks.filter(t =>
