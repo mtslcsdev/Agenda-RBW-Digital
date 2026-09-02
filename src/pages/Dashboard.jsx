@@ -13,17 +13,21 @@ const scheduleItems = [
 ]
 
 export default function Dashboard({ onNewTask, onEditTask }) {
-  const { tasks, toggleTask, deleteTask, clients } = useApp()
+  const { tasks, toggleTask, deleteTask, clients, columns } = useApp()
   const navigate = useNavigate()
 
   const today = new Date().toISOString().slice(0, 10)
   const todayTasks = tasks.filter(t => t.date === today)
   const displayTasks = todayTasks.length > 0 ? todayTasks : tasks.slice(0, 5)
 
-  const getStatus = t => t.taskStatus || (t.done ? 'concluido' : 'pendente')
-  const concluidas = tasks.filter(t => getStatus(t) === 'concluido').length
-  const emProgresso = tasks.filter(t => getStatus(t) === 'em-progresso').length
-  const pendentes = tasks.filter(t => getStatus(t) === 'pendente').length
+  // As colunas do quadro são configuráveis, então o resumo não pode depender de
+  // nomes fixos: concluída é a coluna de conclusão, pendente é a primeira
+  // coluna e "em progresso" é tudo que está no meio do caminho.
+  const primeiraColuna = columns.find(c => !c.isDone)?.id
+  const ehConcluida = t => t.done || columns.find(c => c.id === t.columnId)?.isDone
+  const concluidas  = tasks.filter(ehConcluida).length
+  const pendentes   = tasks.filter(t => !ehConcluida(t) && t.columnId === primeiraColuna).length
+  const emProgresso = tasks.filter(t => !ehConcluida(t) && t.columnId !== primeiraColuna).length
   const total = tasks.length
   const progressPct = total > 0 ? Math.round((concluidas / total) * 100) : 0
 

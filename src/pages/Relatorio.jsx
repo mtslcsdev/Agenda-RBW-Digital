@@ -2,22 +2,25 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { clientSlug } from './ClientDetail'
 
-const STATUS_LABELS = { pendente: 'Pendente', 'em-progresso': 'Em Progresso', concluido: 'Concluído' }
 const PRIORITY_LABELS = { Normal: 'Normal', Alta: 'Alta', Urgente: 'Urgente' }
 
 export default function Relatorio() {
   const { clientId } = useParams()
   const navigate = useNavigate()
-  const { clients, tasks, notes } = useApp()
+  const { clients, tasks, notes, columns } = useApp()
 
   const client = clients.find(c => clientSlug(c.name) === clientId)
   const clientTasks = tasks.filter(t => t.client === client?.name)
   const clientNotes = notes.filter(n => n.project === client?.name)
 
-  const getStatus = t => t.taskStatus || (t.done ? 'concluido' : 'pendente')
-  const concluidas = clientTasks.filter(t => getStatus(t) === 'concluido').length
-  const emProgresso = clientTasks.filter(t => getStatus(t) === 'em-progresso').length
-  const pendentes = clientTasks.filter(t => getStatus(t) === 'pendente').length
+  // Mesmo critério do Dashboard: as colunas são configuráveis, então o status
+  // vem da coluna em que o card está, não de nomes fixos.
+  const primeiraColuna = columns.find(c => !c.isDone)?.id
+  const ehConcluida = t => t.done || columns.find(c => c.id === t.columnId)?.isDone
+  const nomeDaColuna = t => columns.find(c => c.id === t.columnId)?.label || '—'
+  const concluidas  = clientTasks.filter(ehConcluida).length
+  const pendentes   = clientTasks.filter(t => !ehConcluida(t) && t.columnId === primeiraColuna).length
+  const emProgresso = clientTasks.filter(t => !ehConcluida(t) && t.columnId !== primeiraColuna).length
   const total = clientTasks.length
   const pct = total > 0 ? Math.round((concluidas / total) * 100) : 0
 
@@ -109,7 +112,7 @@ export default function Relatorio() {
                     <td style={{ textDecoration: t.done ? 'line-through' : undefined }}>{t.title}</td>
                     <td><span className={`task-tag tag-${t.tagColor}`}>{t.tag}</span></td>
                     <td>{PRIORITY_LABELS[t.priority] || t.priority}</td>
-                    <td>{STATUS_LABELS[getStatus(t)] || getStatus(t)}</td>
+                    <td>{nomeDaColuna(t)}</td>
                     <td>{t.date ? new Date(t.date + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
                   </tr>
                 ))}

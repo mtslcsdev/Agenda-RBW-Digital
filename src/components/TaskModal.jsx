@@ -12,8 +12,8 @@ function toInputDate(iso) {
   return ''
 }
 
-export default function TaskModal({ open, onClose, editingTask = null }) {
-  const { clients, addTask, editTask } = useApp()
+export default function TaskModal({ open, onClose, editingTask = null, preset = null }) {
+  const { clients, addTask, editTask, columns } = useApp()
   const { profile, users, effectiveUser } = useAuth()
   const { canEdit } = usePermission()
   const overlayRef = useRef()
@@ -34,7 +34,9 @@ export default function TaskModal({ open, onClose, editingTask = null }) {
   function handleSubmit(e) {
     e.preventDefault()
     const fd = new FormData(e.target)
-    const taskStatus = fd.get('taskStatus') || 'pendente'
+    // "Concluída" deixou de ser um nome fixo: é a coluna marcada como conclusão.
+    const columnId = Number(fd.get('columnId')) || columns[0]?.id || null
+    const coluna = columns.find(c => c.id === columnId)
     const data = {
       title: fd.get('title'),
       client: fd.get('client'),
@@ -43,8 +45,8 @@ export default function TaskModal({ open, onClose, editingTask = null }) {
       notes: fd.get('notes'),
       tag: selectedTag,
       tagColor: TAG_COLORS[selectedTag] || 'green',
-      taskStatus,
-      done: taskStatus === 'concluido',
+      columnId,
+      done: coluna?.isDone || false,
       assigneeName: fd.get('assigneeName') || '',
     }
     if (isEdit) editTask(editingTask.id, data, effectiveUser)
@@ -108,11 +110,15 @@ export default function TaskModal({ open, onClose, editingTask = null }) {
             </div>
           </div>
           <div className="form-group">
-            <label>STATUS NO QUADRO</label>
-            <select name="taskStatus" defaultValue={editingTask?.taskStatus || 'pendente'} key={editingTask?.id ?? 'new-status'}>
-              <option value="pendente">○ Pendente</option>
-              <option value="em-progresso">◑ Em Progresso</option>
-              <option value="concluido">● Concluído</option>
+            <label>COLUNA DO QUADRO</label>
+            <select
+              name="columnId"
+              defaultValue={editingTask?.columnId ?? preset?.columnId ?? columns[0]?.id ?? ''}
+              key={editingTask?.id ?? `new-col-${preset?.columnId ?? ''}`}
+            >
+              {columns.map(c => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
             </select>
           </div>
           <div className="form-group">

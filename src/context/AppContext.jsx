@@ -10,11 +10,14 @@ export const TAG_COLORS = {
 export const TAG_OPTIONS = ['GHL', 'N8N', 'Vendas', 'Reunião', 'Dev', 'Pessoal']
 export const CLIENT_COLORS = ['#2D6A4F', '#5B4FCF', '#E07A3A', '#D94F3D', '#E8A923', '#3A7CA5']
 export const PRIORITY_COLORS = { Normal: null, Alta: 'var(--accent2)', Urgente: 'var(--red)' }
-export const KANBAN_COLUMNS = [
-  { id: 'pendente',     label: 'Pendente',     color: 'var(--text3)' },
-  { id: 'em-progresso', label: 'Em Progresso', color: 'var(--accent3)' },
-  { id: 'concluido',   label: 'Concluído',    color: 'var(--accent)' },
+// As colunas do quadro deixaram de ser fixas no código: agora vêm da tabela
+// board_columns e podem ser criadas, renomeadas e reordenadas pela interface.
+export const COLUMN_COLORS = [
+  '#6B6960', '#E07A3A', '#2D6A4F', '#5B4FCF', '#D94F3D', '#E8A923', '#3A7CA5',
 ]
+// Espaçamento entre posições. Inserções usam a média entre vizinhos, então
+// esse valor só precisa ser grande o bastante para não esgotar a precisão.
+const POSITION_GAP = 1000
 export const STATUS_OPTIONS = [
   { label: 'Em andamento', color: 'orange' },
   { label: 'Ativo',        color: 'green' },
@@ -36,6 +39,8 @@ const mapTask = r => ({
   notes: r.notes || '',
   done: r.done || false,
   taskStatus: r.task_status || 'pendente',
+  columnId: r.column_id ?? null,
+  position: r.position != null ? Number(r.position) : 0,
   archived: r.archived || false,
   assigneeName: r.assignee_name || '',
   assignee_id: r.assignee_id || null,
@@ -55,6 +60,14 @@ const mapNote = r => ({
   date: r.date || r.created_at?.slice(0, 10) || '',
   type: r.type || 'text', items: r.items || [],
   pinned: r.pinned || false, archived: r.archived || false,
+})
+const mapColumn = r => ({
+  id: r.id,
+  label: r.label,
+  color: r.color || '#6B6960',
+  position: Number(r.position),
+  isDone: r.is_done || false,
+  archived: r.archived || false,
 })
 const mapComment = r => ({
   id: r.id, userId: r.user_id, userName: r.user_name,
@@ -94,6 +107,8 @@ const taskRow = t => ({
   priority: t.priority || 'Normal', date: t.date || '',
   notes: t.notes || '', done: t.done || false,
   task_status: t.taskStatus || 'pendente',
+  column_id: t.columnId ?? null,
+  position: t.position ?? 1000,
   assignee_name: t.assigneeName || '', assignee_id: t.assignee_id || null,
 })
 const clientRow = c => ({
@@ -121,6 +136,7 @@ export function AppProvider({ children }) {
   const [timeEntries, setTimeEntries]     = useState([])
   const [docs, setDocsState]              = useState([])
   const [folders, setFoldersState]        = useState([])
+  const [columns, setColumnsState]        = useState([])
   const [activeTimer, setActiveTimer]     = useState(() => {
     try { return JSON.parse(localStorage.getItem('fd_activeTimer')) } catch { return null }
   })
@@ -164,12 +180,14 @@ export function AppProvider({ children }) {
   // reapareceriam a cada recarga automática.
   async function loadAll({ notify = false } = {}) {
     try {
-      // Fase 1 — crítica (tasks, clients, notes)
-      const [tRes, cRes, nRes] = await Promise.all([
+      // Fase 1 — crítica (colunas, tasks, clients, notes)
+      const [colRes, tRes, cRes, nRes] = await Promise.all([
+        supabase.from('board_columns').select('*').eq('archived', false).order('position'),
         supabase.from('tasks').select('*').order('created_at', { ascending: false }),
         supabase.from('clients').select('*').order('created_at', { ascending: false }),
         supabase.from('notes').select('*').order('pinned', { ascending: false }).order('created_at', { ascending: false }),
       ])
+      if (colRes.data) setColumnsState(colRes.data.map(mapColumn))
       if (tRes.data) setTasksState(tRes.data.map(mapTask))
       if (cRes.data) setClientsState(cRes.data.map(mapClient))
       if (nRes.data) setNotesState(nRes.data.map(mapNote))
@@ -297,7 +315,15 @@ export function AppProvider({ children }) {
 
   // ── TASKS ─────────────────────────────────────────────────────
   async function addTask(data, actor) {
-    const tmp = { ...data, id: 'tmp-' + Date.now(), done: false, taskStatus: data.taskStatus || 'pendente' }
+    const columnId = data.columnId ?? columns[0]?.id ?? null
+    const tmp = {
+      ...data,
+      id: 'tmp-' + Date.now(),
+      done: false,
+      taskStatus: data.taskStatus || 'pendente',
+      columnId,
+      position: posicaoNoTopo(columnId),
+    }
     setTasksState(prev => [tmp, ...prev])
     const { data: row } = await supabase
       .from('tasks')
@@ -309,9 +335,13 @@ export function AppProvider({ children }) {
   }
 
   async function editTask(id, data, actor) {
+    // Mescla com a tarefa atual antes de gravar: taskRow preenche o que estiver
+    // faltando com valores padrão, então enviar só o que veio do formulário
+    // apagaria coluna, posição e demais campos fora do modal.
+    const atual = tasks.find(t => t.id === id)
     setTasksState(prev => prev.map(t => t.id === id ? { ...t, ...data } : t))
-    await supabase.from('tasks').update(taskRow({ ...data })).eq('id', id)
-    if (actor) _log(actor, 'editou a tarefa', 'tarefa', data.title || '')
+    await supabase.from('tasks').update(taskRow({ ...atual, ...data })).eq('id', id)
+    if (actor) _log(actor, 'editou a tarefa', 'tarefa', data.title || atual?.title || '')
   }
 
   async function deleteTask(id, actor) {
@@ -322,28 +352,62 @@ export function AppProvider({ children }) {
     if (actor && task) _log(actor, 'removeu a tarefa', 'tarefa', task.title)
   }
 
+  // Posição para inserir no topo de uma coluna
+  function posicaoNoTopo(columnId) {
+    const naColuna = tasks.filter(t => t.columnId === columnId && !t.archived)
+    if (!naColuna.length) return POSITION_GAP
+    return Math.min(...naColuna.map(t => t.position)) - POSITION_GAP
+  }
+
   async function toggleTask(id, actor) {
     const task = tasks.find(t => t.id === id)
     if (!task) return
     const done = !task.done
-    const taskStatus = done ? 'concluido' : 'pendente'
-    setTasksState(prev => prev.map(t => t.id === id ? { ...t, done, taskStatus } : t))
-    await supabase.from('tasks').update({ done, task_status: taskStatus }).eq('id', id)
+    // Concluir move o card para a coluna marcada como "concluído"; reabrir
+    // devolve para a primeira coluna que não seja de conclusão.
+    const alvo = columns.find(c => (done ? c.isDone : !c.isDone))
+
+    if (alvo && alvo.id !== task.columnId) {
+      await moveTask(id, alvo.id, posicaoNoTopo(alvo.id), null)
+    } else {
+      setTasksState(prev => prev.map(t => t.id === id ? { ...t, done } : t))
+      await supabase.from('tasks').update({ done }).eq('id', id)
+    }
+
     if (actor) {
       _notify(done ? '🏁' : '↩', done ? `Concluída: ${task.title}` : `Reaberta: ${task.title}`, done ? 'task.done' : 'task.reopened')
       _log(actor, done ? 'concluiu a tarefa' : 'reabriu a tarefa', 'tarefa', task.title)
     }
   }
 
-  async function moveTask(id, newStatus, actor) {
+  // Move um card para outra coluna e/ou outra posição. `novaPosicao` já vem
+  // calculada pelo quadro (média entre os vizinhos do destino), então aqui só
+  // gravamos. Se o servidor recusar, desfazemos a mudança na tela.
+  async function moveTask(id, columnId, novaPosicao, actor) {
     const task = tasks.find(t => t.id === id)
-    const done = newStatus === 'concluido'
-    setTasksState(prev => prev.map(t => t.id !== id ? t : { ...t, taskStatus: newStatus, done }))
-    await supabase.from('tasks').update({ task_status: newStatus, done }).eq('id', id)
-    if (actor && task) {
-      const col = KANBAN_COLUMNS.find(c => c.id === newStatus)?.label || newStatus
-      _notify('🔀', `Movida para ${col}: ${task.title}`, 'task.moved')
-      _log(actor, `moveu para ${col}`, 'tarefa', task.title)
+    if (!task) return
+    const col       = columns.find(c => c.id === columnId)
+    const done      = col ? col.isDone : task.done
+    const anterior  = { columnId: task.columnId, position: task.position, done: task.done }
+    const mudouCol  = anterior.columnId !== columnId
+
+    setTasksState(prev => prev.map(t =>
+      t.id !== id ? t : { ...t, columnId, position: novaPosicao, done }))
+
+    const { error } = await supabase
+      .from('tasks')
+      .update({ column_id: columnId, position: novaPosicao, done })
+      .eq('id', id)
+
+    if (error) {
+      setTasksState(prev => prev.map(t => t.id !== id ? t : { ...t, ...anterior }))
+      _notify('⚠️', 'Não foi possível mover a tarefa.', 'error')
+      return
+    }
+
+    if (actor && col && mudouCol) {
+      _notify('🔀', `Movida para ${col.label}: ${task.title}`, 'task.moved')
+      _log(actor, `moveu para ${col.label}`, 'tarefa', task.title)
     }
   }
 
@@ -351,6 +415,102 @@ export function AppProvider({ children }) {
     const archived = !(tasks.find(t => t.id === id)?.archived)
     setTasksState(prev => prev.map(t => t.id === id ? { ...t, archived } : t))
     await supabase.from('tasks').update({ archived }).eq('id', id)
+  }
+
+  // Renumera uma coluna inteira com espaçamento regular. Serve de escape para
+  // quando as inserções fracionárias sucessivas deixam os vizinhos próximos
+  // demais para caber outro valor entre eles.
+  async function reorderColumn(columnId, idsOrdenados) {
+    const novos = idsOrdenados.map((id, i) => ({ id, position: (i + 1) * POSITION_GAP }))
+    setTasksState(prev => prev.map(t => {
+      const novo = novos.find(n => n.id === t.id)
+      return novo ? { ...t, columnId, position: novo.position } : t
+    }))
+    await Promise.all(novos.map(n =>
+      supabase.from('tasks').update({ column_id: columnId, position: n.position }).eq('id', n.id)
+    ))
+  }
+
+  // ── COLUNAS DO QUADRO ─────────────────────────────────────────
+  const ordenarColunas = lista => [...lista].sort((a, b) => a.position - b.position)
+
+  async function addColumn(label) {
+    const nome = (label || '').trim()
+    if (!nome) return { ok: false, error: 'Dê um nome à coluna.' }
+
+    const position = columns.length
+      ? Math.max(...columns.map(c => c.position)) + POSITION_GAP
+      : POSITION_GAP
+    const color = COLUMN_COLORS[columns.length % COLUMN_COLORS.length]
+
+    const { data: row, error } = await supabase
+      .from('board_columns').insert({ label: nome, color, position }).select().single()
+    if (error) return { ok: false, error: error.message }
+
+    setColumnsState(prev => ordenarColunas([...prev, mapColumn(row)]))
+    return { ok: true }
+  }
+
+  async function updateColumn(id, patch) {
+    const anterior = columns.find(c => c.id === id)
+    if (!anterior) return { ok: false, error: 'Coluna não encontrada.' }
+    if (patch.label !== undefined && !patch.label.trim())
+      return { ok: false, error: 'O nome não pode ficar vazio.' }
+
+    setColumnsState(prev => ordenarColunas(
+      prev.map(c => c.id === id ? { ...c, ...patch } : c)))
+
+    const row = {}
+    if (patch.label    !== undefined) row.label    = patch.label.trim()
+    if (patch.color    !== undefined) row.color    = patch.color
+    if (patch.isDone   !== undefined) row.is_done  = patch.isDone
+    if (patch.position !== undefined) row.position = patch.position
+
+    const { error } = await supabase.from('board_columns').update(row).eq('id', id)
+    if (error) {
+      setColumnsState(prev => ordenarColunas(prev.map(c => c.id === id ? anterior : c)))
+      return { ok: false, error: error.message }
+    }
+    return { ok: true }
+  }
+
+  // Reordena colunas pelo índice de destino, usando a média entre as vizinhas.
+  async function moveColumn(id, novoIndice) {
+    const restantes = columns.filter(c => c.id !== id)
+    const antes = restantes[novoIndice - 1]
+    const depois = restantes[novoIndice]
+    let position
+    if (!antes && !depois)      position = POSITION_GAP
+    else if (!antes)            position = depois.position - POSITION_GAP
+    else if (!depois)           position = antes.position + POSITION_GAP
+    else                        position = (antes.position + depois.position) / 2
+    return updateColumn(id, { position })
+  }
+
+  // Arquivar não pode engolir tarefas: elas vão para a primeira coluna restante.
+  async function archiveColumn(id) {
+    const destino = columns.find(c => c.id !== id)
+    if (!destino) return { ok: false, error: 'O quadro precisa de ao menos uma coluna.' }
+
+    const orfas = tasks.filter(t => t.columnId === id)
+    if (orfas.length) {
+      const base = posicaoNoTopo(destino.id)
+      const movidas = orfas.map((t, i) => ({ ...t, columnId: destino.id, position: base - i * POSITION_GAP }))
+      setTasksState(prev => prev.map(t => movidas.find(m => m.id === t.id) || t))
+      const { error } = await supabase
+        .from('tasks')
+        .update({ column_id: destino.id, done: destino.isDone })
+        .eq('column_id', id)
+      if (error) {
+        setTasksState(prev => prev.map(t => orfas.find(o => o.id === t.id) || t))
+        return { ok: false, error: error.message }
+      }
+    }
+
+    const { error } = await supabase.from('board_columns').update({ archived: true }).eq('id', id)
+    if (error) return { ok: false, error: error.message }
+    setColumnsState(prev => prev.filter(c => c.id !== id))
+    return { ok: true }
   }
 
   // ── CLIENTS ───────────────────────────────────────────────────
@@ -546,6 +706,7 @@ export function AppProvider({ children }) {
       theme, toggleTheme,
       tasks: activeTasks, allTasks: tasks, archivedTasks,
       addTask, editTask, deleteTask, toggleTask, moveTask, archiveTask,
+      columns, addColumn, updateColumn, moveColumn, archiveColumn, reorderColumn,
       clients: activeClients, allClients: clients, hiddenClients, archivedClients,
       addClient, editClient, archiveClient, toggleClientHidden,
       notes: activeNotes, allNotes: notes, archivedNotes,

@@ -6,12 +6,24 @@ import {
   useSensor,
   useSensors,
   useDroppable,
-  useDraggable,
+  closestCorners,
 } from '@dnd-kit/core'
-import { useApp, KANBAN_COLUMNS, PRIORITY_COLORS } from '../../context/AppContext'
+import {
+  SortableContext,
+  useSortable,
+  arrayMove,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { useApp, PRIORITY_COLORS, COLUMN_COLORS } from '../../context/AppContext'
 import { useAuth } from '../../context/AuthContext'
 import { usePermission } from '../../hooks/usePermission'
 import TaskTag from './TaskTag'
+
+const POSITION_GAP = 1000
+// Abaixo disso os vizinhos estão próximos demais para caber outro valor entre
+// eles — em vez de arriscar perder precisão, renumeramos a coluna inteira.
+const GAP_MINIMO = 0.0001
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -28,17 +40,7 @@ function getRelativeDate(iso) {
   return { label: `Há ${Math.abs(diff)} dias`, overdue: true }
 }
 
-function getTaskStatus(task) {
-  return task.taskStatus || (task.done ? 'concluido' : 'pendente')
-}
-
-const COLUMN_ICONS = {
-  'pendente':     '○',
-  'em-progresso': '◑',
-  'concluido':    '●',
-}
-
-// ── Card visual (shared between DraggableCard and DragOverlay) ─
+// ── Card ───────────────────────────────────────────────────────
 
 function CardContent({ task, onEdit, showActions = true }) {
   const { deleteTask } = useApp()
@@ -58,9 +60,7 @@ function CardContent({ task, onEdit, showActions = true }) {
       )}
       <div className="kanban-card-body">
         <div className="kanban-card-title">{task.title}</div>
-        {task.client && (
-          <div className="kanban-card-client">{task.client}</div>
-        )}
+        {task.client && <div className="kanban-card-client">{task.client}</div>}
         <div className="kanban-card-meta">
           {task.tag && <TaskTag label={task.tag} color={task.tagColor} />}
           {rel && (
@@ -101,17 +101,19 @@ function CardContent({ task, onEdit, showActions = true }) {
   )
 }
 
-// ── DraggableCard ──────────────────────────────────────────────
-
-function DraggableCard({ task, onEdit }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: String(task.id),
-  })
+function SortableCard({ task, onEdit }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: String(task.id) })
 
   return (
     <div
       ref={setNodeRef}
-      style={{ opacity: isDragging ? 0.4 : 1, touchAction: 'none' }}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : 1,
+        touchAction: 'none',
+      }}
       {...listeners}
       {...attributes}
     >
@@ -120,67 +122,258 @@ function DraggableCard({ task, onEdit }) {
   )
 }
 
-// ── DroppableColumn ────────────────────────────────────────────
+// ── Cabeçalho da coluna (renomear, cor, mover, arquivar) ───────
 
-function DroppableColumn({ col, tasks, onNew, onEdit, clientFilter }) {
-  const { setNodeRef, isOver } = useDroppable({ id: col.id })
+function ColumnHeader({ col, count, index, total }) {
+  const { updateColumn, moveColumn, archiveColumn } = useApp()
+  const { canEdit } = usePermission()
+  const [editando, setEditando] = useState(false)
+  const [nome, setNome] = useState(col.label)
+  const [menu, setMenu] = useState(false)
+  const [erro, setErro] = useState('')
 
-  const colTasks = tasks.filter(t => {
-    if (getTaskStatus(t) !== col.id) return false
-    if (clientFilter && t.client !== clientFilter) return false
-    return true
-  })
+  async function salvarNome() {
+    const res = await updateColumn(col.id, { label: nome })
+    if (!res.ok) { setErro(res.error); return }
+    setErro('')
+    setEditando(false)
+  }
+
+  async function arquivar() {
+    setMenu(false)
+    const res = await archiveColumn(col.id)
+    if (!res.ok) setErro(res.error)
+  }
+
+  if (editando) {
+    return (
+      <div className="kanban-col-header" style={{ gap: '6px' }}>
+        <input
+          value={nome}
+          onChange={e => { setNome(e.target.value); setErro('') }}
+          autoFocus
+          onKeyDown={e => {
+            if (e.key === 'Enter') salvarNome()
+            if (e.key === 'Escape') { setEditando(false); setNome(col.label); setErro('') }
+          }}
+          style={{
+            flex: 1, minWidth: 0, fontSize: '12px', padding: '3px 6px', fontWeight: 700,
+            border: `1px solid ${erro ? 'var(--red)' : 'var(--border)'}`,
+            borderRadius: '5px', background: 'var(--surface2)', color: 'var(--text)',
+          }}
+        />
+        <button className="btn-icon" style={{ width: '22px', height: '22px', fontSize: '11px' }}
+          onClick={() => { setEditando(false); setNome(col.label); setErro('') }}>✕</button>
+        <button className="btn-icon" style={{ width: '22px', height: '22px', fontSize: '11px', color: 'var(--accent)' }}
+          onClick={salvarNome}>✓</button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="kanban-col-header" style={{ position: 'relative' }}>
+      <span
+        style={{
+          width: '9px', height: '9px', borderRadius: '50%',
+          background: col.color, flexShrink: 0,
+        }}
+      />
+      <span className="kanban-col-label" style={{ flex: 1, minWidth: 0 }}>
+        {col.label.toUpperCase()}
+      </span>
+      {col.isDone && <span title="Coluna de conclusão" style={{ fontSize: '10px' }}>🏁</span>}
+      <span className="kanban-col-count">{count}</span>
+
+      {canEdit && (
+        <button
+          className="btn-icon"
+          style={{ width: '22px', height: '22px', fontSize: '12px', color: 'var(--text3)' }}
+          onClick={() => setMenu(m => !m)}
+          title="Opções da coluna"
+        >
+          ⋯
+        </button>
+      )}
+
+      {menu && (
+        <>
+          {/* clique fora fecha */}
+          <div style={{ position: 'fixed', inset: 0, zIndex: 10 }} onClick={() => setMenu(false)} />
+          <div
+            style={{
+              position: 'absolute', top: '100%', right: 0, zIndex: 11, minWidth: '190px',
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', padding: '6px',
+            }}
+          >
+            <button className="btn btn-ghost" style={menuItem}
+              onClick={() => { setMenu(false); setEditando(true) }}>✏️ Renomear</button>
+
+            <div style={{ padding: '6px 8px', display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+              {COLUMN_COLORS.map(c => (
+                <button
+                  key={c}
+                  onClick={() => { updateColumn(col.id, { color: c }); setMenu(false) }}
+                  title="Mudar cor"
+                  style={{
+                    width: '17px', height: '17px', borderRadius: '50%', background: c,
+                    border: col.color === c ? '2px solid var(--text)' : '1px solid var(--border)',
+                    cursor: 'pointer', padding: 0,
+                  }}
+                />
+              ))}
+            </div>
+
+            <button className="btn btn-ghost" style={menuItem} disabled={index === 0}
+              onClick={() => { moveColumn(col.id, index - 1); setMenu(false) }}>← Mover para a esquerda</button>
+            <button className="btn btn-ghost" style={menuItem} disabled={index === total - 1}
+              onClick={() => { moveColumn(col.id, index + 1); setMenu(false) }}>→ Mover para a direita</button>
+
+            <button className="btn btn-ghost" style={menuItem}
+              onClick={() => { updateColumn(col.id, { isDone: !col.isDone }); setMenu(false) }}>
+              🏁 {col.isDone ? 'Não é mais conclusão' : 'Marcar como conclusão'}
+            </button>
+
+            <button className="btn btn-ghost" style={{ ...menuItem, color: 'var(--red)' }}
+              onClick={arquivar}>🗄 Arquivar coluna</button>
+          </div>
+        </>
+      )}
+
+      {erro && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, fontSize: '10px',
+          color: 'var(--red)', padding: '2px 4px',
+        }}>{erro}</div>
+      )}
+    </div>
+  )
+}
+
+const menuItem = {
+  display: 'block', width: '100%', textAlign: 'left',
+  fontSize: '12px', padding: '6px 8px', borderRadius: '5px',
+}
+
+// ── Coluna ─────────────────────────────────────────────────────
+
+function Column({ col, tasks, onNew, onEdit, index, total }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `col:${col.id}` })
+  const ids = tasks.map(t => String(t.id))
 
   return (
     <div
       ref={setNodeRef}
       className={`kanban-col${isOver ? ' drag-over' : ''}`}
       style={isOver ? {
-        borderColor: 'var(--accent)',
+        borderColor: col.color,
         background: 'color-mix(in srgb, var(--accent) 6%, var(--surface))',
       } : undefined}
     >
-      <div className="kanban-col-header">
-        <span className="kanban-col-icon" style={{ color: col.color }}>
-          {COLUMN_ICONS[col.id]}
-        </span>
-        <span className="kanban-col-label">{col.label.toUpperCase()}</span>
-        <span className="kanban-col-count">{colTasks.length}</span>
-      </div>
+      <ColumnHeader col={col} count={tasks.length} index={index} total={total} />
 
       <div className="kanban-col-body">
-        {colTasks.length === 0 ? (
-          <div className={`kanban-empty${isOver ? ' drag-target' : ''}`}>
-            {isOver ? 'Soltar aqui' : 'Nenhuma tarefa'}
-          </div>
-        ) : (
-          colTasks.map(task => (
-            <DraggableCard key={task.id} task={task} onEdit={onEdit} />
-          ))
-        )}
+        <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+          {tasks.length === 0 ? (
+            <div className={`kanban-empty${isOver ? ' drag-target' : ''}`}>
+              {isOver ? 'Soltar aqui' : 'Nenhuma tarefa'}
+            </div>
+          ) : (
+            tasks.map(task => (
+              <SortableCard key={task.id} task={task} onEdit={onEdit} />
+            ))
+          )}
+        </SortableContext>
       </div>
 
-      <button className="kanban-add-btn" onClick={onNew}>
+      <button className="kanban-add-btn" onClick={() => onNew({ columnId: col.id })}>
         + Adicionar Tarefa
       </button>
     </div>
   )
 }
 
-// ── KanbanBoard (main export) ─────────────────────────────────
+// ── Botão de nova coluna ───────────────────────────────────────
+
+function AddColumn() {
+  const { addColumn } = useApp()
+  const [aberto, setAberto] = useState(false)
+  const [nome, setNome] = useState('')
+  const [erro, setErro] = useState('')
+
+  async function criar() {
+    const res = await addColumn(nome)
+    if (!res.ok) { setErro(res.error); return }
+    setNome(''); setErro(''); setAberto(false)
+  }
+
+  if (!aberto) {
+    return (
+      <button
+        className="kanban-col"
+        onClick={() => setAberto(true)}
+        style={{
+          minHeight: '52px', height: 'fit-content', cursor: 'pointer',
+          border: '1px dashed var(--border)', background: 'transparent',
+          color: 'var(--text3)', fontSize: '13px', fontWeight: 600,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '14px',
+        }}
+      >
+        + Nova coluna
+      </button>
+    )
+  }
+
+  return (
+    <div className="kanban-col" style={{ height: 'fit-content', padding: '12px' }}>
+      <input
+        value={nome}
+        onChange={e => { setNome(e.target.value); setErro('') }}
+        placeholder="Nome da coluna"
+        autoFocus
+        onKeyDown={e => {
+          if (e.key === 'Enter') criar()
+          if (e.key === 'Escape') { setAberto(false); setNome(''); setErro('') }
+        }}
+        style={{
+          width: '100%', fontSize: '12px', padding: '6px 8px',
+          border: `1px solid ${erro ? 'var(--red)' : 'var(--border)'}`,
+          borderRadius: '6px', background: 'var(--surface2)', color: 'var(--text)',
+        }}
+      />
+      {erro && <div style={{ fontSize: '10px', color: 'var(--red)', marginTop: '4px' }}>{erro}</div>}
+      <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+        <button className="btn btn-ghost" style={{ fontSize: '11px', flex: 1 }}
+          onClick={() => { setAberto(false); setNome(''); setErro('') }}>Cancelar</button>
+        <button className="btn btn-primary" style={{ fontSize: '11px', flex: 1 }}
+          onClick={criar}>Criar</button>
+      </div>
+    </div>
+  )
+}
+
+// ── Quadro ─────────────────────────────────────────────────────
 
 export default function KanbanBoard({ tasks, onNew, onEdit, clientFilter, onClientFilterChange, clients }) {
-  const { moveTask } = useApp()
+  const { columns, moveTask, reorderColumn } = useApp()
   const { effectiveUser } = useAuth()
+  const { canEdit } = usePermission()
   const [activeTask, setActiveTask] = useState(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
 
+  // As tarefas já chegam filtradas pela página; aqui só agrupamos por coluna.
+  // Tarefas cuja coluna foi removida caem na primeira, para nenhum card sumir.
+  function cardsDaColuna(colId, isPrimeira) {
+    return tasks
+      .filter(t => t.columnId === colId || (isPrimeira && !columns.some(c => c.id === t.columnId)))
+      .sort((a, b) => a.position - b.position)
+  }
+
   function handleDragStart({ active }) {
-    const task = tasks.find(t => String(t.id) === active.id)
-    setActiveTask(task || null)
+    setActiveTask(tasks.find(t => String(t.id) === active.id) || null)
   }
 
   function handleDragEnd({ active, over }) {
@@ -190,93 +383,113 @@ export default function KanbanBoard({ tasks, onNew, onEdit, clientFilter, onClie
     const task = tasks.find(t => String(t.id) === active.id)
     if (!task) return
 
-    const currentStatus = getTaskStatus(task)
-    if (over.id !== currentStatus) {
-      moveTask(task.id, over.id, effectiveUser)
-    }
-  }
+    // O alvo é uma coluna vazia ou outro card
+    const sobreColuna = String(over.id).startsWith('col:')
+    const destColId = sobreColuna
+      ? Number(String(over.id).slice(4))
+      : tasks.find(t => String(t.id) === String(over.id))?.columnId
+    if (destColId == null) return
 
-  function handleDragCancel() {
-    setActiveTask(null)
+    const primeiraId = columns[0]?.id
+    const lista = cardsDaColuna(destColId, destColId === primeiraId)
+
+    // Reproduz o resultado visual do dnd-kit para achar os vizinhos finais
+    let resultado
+    const oldIndex = lista.findIndex(t => t.id === task.id)
+    if (sobreColuna) {
+      resultado = oldIndex >= 0 ? lista : [...lista, task]
+    } else {
+      const overIndex = lista.findIndex(t => String(t.id) === String(over.id))
+      if (overIndex < 0) return
+      if (oldIndex >= 0) {
+        resultado = arrayMove(lista, oldIndex, overIndex)
+      } else {
+        resultado = [...lista]
+        resultado.splice(overIndex, 0, task)
+      }
+    }
+
+    const finalIdx = resultado.findIndex(t => t.id === task.id)
+
+    // Soltou no mesmo lugar de onde saiu
+    if (task.columnId === destColId && finalIdx === oldIndex) return
+
+    const antes  = resultado[finalIdx - 1]
+    const depois = resultado[finalIdx + 1]
+
+    let novaPosicao
+    if (!antes && !depois)      novaPosicao = POSITION_GAP
+    else if (!antes)            novaPosicao = depois.position - POSITION_GAP
+    else if (!depois)           novaPosicao = antes.position + POSITION_GAP
+    else if (Math.abs(depois.position - antes.position) < GAP_MINIMO) {
+      // Sem espaço entre os vizinhos: renumera a coluna inteira
+      reorderColumn(destColId, resultado.map(t => t.id))
+      return
+    } else {
+      novaPosicao = (antes.position + depois.position) / 2
+    }
+
+    moveTask(task.id, destColId, novaPosicao, effectiveUser)
   }
 
   return (
     <div>
-      {/* Client filter bar */}
+      {/* Filtro por cliente */}
       {clients && clients.length > 0 && (
         <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={{ fontSize: '12px', color: 'var(--text3)', marginRight: '2px' }}>Cliente:</span>
-          <button
-            className={`task-tag${clientFilter === '' ? ' tag-green' : ''}`}
-            style={{
-              cursor: 'pointer', padding: '4px 10px',
-              border: clientFilter === '' ? '1px solid currentColor' : '1px solid var(--border)',
-              background: clientFilter === '' ? undefined : 'transparent',
-              color: clientFilter === '' ? undefined : 'var(--text2)',
-            }}
-            onClick={() => onClientFilterChange('')}
-          >
-            Todos
-          </button>
-          {clients.map(c => (
-            <button
-              key={c.id}
-              className={`task-tag${clientFilter === c.name ? ' tag-green' : ''}`}
-              style={{
-                cursor: 'pointer', padding: '4px 10px',
-                border: clientFilter === c.name ? '1px solid currentColor' : '1px solid var(--border)',
-                background: clientFilter === c.name ? undefined : 'transparent',
-                color: clientFilter === c.name ? undefined : 'var(--text2)',
-              }}
-              onClick={() => onClientFilterChange(c.name === clientFilter ? '' : c.name)}
-            >
-              {c.name}
-            </button>
-          ))}
-          <button
-            className={`task-tag${clientFilter === 'Pessoal' ? ' tag-green' : ''}`}
-            style={{
-              cursor: 'pointer', padding: '4px 10px',
-              border: clientFilter === 'Pessoal' ? '1px solid currentColor' : '1px solid var(--border)',
-              background: clientFilter === 'Pessoal' ? undefined : 'transparent',
-              color: clientFilter === 'Pessoal' ? undefined : 'var(--text2)',
-            }}
-            onClick={() => onClientFilterChange(clientFilter === 'Pessoal' ? '' : 'Pessoal')}
-          >
-            Pessoal
-          </button>
+          {[{ id: '', name: 'Todos' }, ...clients, { id: 'Pessoal', name: 'Pessoal' }].map(c => {
+            const valor = c.name === 'Todos' ? '' : c.name
+            const ativo = clientFilter === valor
+            return (
+              <button
+                key={c.id || 'todos'}
+                className={`task-tag${ativo ? ' tag-green' : ''}`}
+                style={{
+                  cursor: 'pointer', padding: '4px 10px',
+                  border: ativo ? '1px solid currentColor' : '1px solid var(--border)',
+                  background: ativo ? undefined : 'transparent',
+                  color: ativo ? undefined : 'var(--text2)',
+                }}
+                onClick={() => onClientFilterChange(ativo && valor ? '' : valor)}
+              >
+                {c.name}
+              </button>
+            )
+          })}
         </div>
       )}
 
       <DndContext
         sensors={sensors}
+        collisionDetection={closestCorners}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
+        onDragCancel={() => setActiveTask(null)}
       >
         <div className="kanban-board">
-          {KANBAN_COLUMNS.map(col => (
-            <DroppableColumn
+          {columns.map((col, i) => (
+            <Column
               key={col.id}
               col={col}
-              tasks={tasks}
+              tasks={cardsDaColuna(col.id, i === 0)}
               onNew={onNew}
               onEdit={onEdit}
-              clientFilter={clientFilter}
+              index={i}
+              total={columns.length}
             />
           ))}
+          {canEdit && <AddColumn />}
         </div>
 
         <DragOverlay>
           {activeTask ? (
-            <div
-              style={{
-                boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-                opacity: 0.95,
-                transform: 'rotate(2deg)',
-                pointerEvents: 'none',
-              }}
-            >
+            <div style={{
+              boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+              opacity: 0.95,
+              transform: 'rotate(2deg)',
+              pointerEvents: 'none',
+            }}>
               <CardContent task={activeTask} onEdit={null} showActions={false} />
             </div>
           ) : null}

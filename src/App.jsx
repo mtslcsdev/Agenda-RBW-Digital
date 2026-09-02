@@ -69,12 +69,20 @@ function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [taskOpen, setTaskOpen] = useState(false)
   const [editingTask, setEditingTask] = useState(null)
+  const [taskPreset, setTaskPreset] = useState(null)
   const [clientOpen, setClientOpen] = useState(false)
   const [editingClient, setEditingClient] = useState(null)
 
   if (appLoading) return <LoadingScreen />
 
-  function openNewTask() { setEditingTask(null); setTaskOpen(true) }
+  // O quadro chama com { columnId } no "+ Adicionar Tarefa" de cada coluna.
+  // Nos outros lugares onNew vai direto num onClick e recebe o evento do
+  // clique, por isso a checagem antes de tratar como preset.
+  function openNewTask(preset) {
+    setEditingTask(null)
+    setTaskPreset(preset && preset.columnId != null ? preset : null)
+    setTaskOpen(true)
+  }
   function openEditTask(task) { setEditingTask(task); setTaskOpen(true) }
   function openNewClient() { setEditingClient(null); setClientOpen(true) }
   function openEditClient(client) { setEditingClient(client); setClientOpen(true) }
@@ -125,7 +133,12 @@ function AppLayout() {
         </div>
       </div>
 
-      <TaskModal open={taskOpen} onClose={() => { setTaskOpen(false); setEditingTask(null) }} editingTask={editingTask} />
+      <TaskModal
+        open={taskOpen}
+        onClose={() => { setTaskOpen(false); setEditingTask(null); setTaskPreset(null) }}
+        editingTask={editingTask}
+        preset={taskPreset}
+      />
       <ClientModal open={clientOpen} onClose={() => { setClientOpen(false); setEditingClient(null) }} editingClient={editingClient} />
     </div>
   )
