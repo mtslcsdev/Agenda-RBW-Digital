@@ -264,7 +264,7 @@ export default function AdminUsuarios() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '2px' }}>
                     <span style={{ fontSize: '13px', fontWeight: 600 }}>{user.name}</span>
                     {isOwn && <span style={{ fontSize: '10px', background: 'var(--accent-light)', color: 'var(--accent)', padding: '1px 7px', borderRadius: '10px', fontWeight: 600 }}>Você</span>}
-                    {isSA  && <span style={{ fontSize: '10px', background: '#fee2e2', color: '#ef4444', padding: '1px 7px', borderRadius: '10px', fontWeight: 600 }}>Super Admin</span>}
+                    {isSA  && <span style={{ fontSize: '10px', background: 'var(--red-light)', color: 'var(--red)', padding: '1px 7px', borderRadius: '10px', fontWeight: 600 }}>Super Admin</span>}
                     {canAct && (
                       <button className="btn-icon" style={{ width: '20px', height: '20px', fontSize: '11px', color: 'var(--text3)' }} onClick={() => openEditName(user)} title="Editar nome">✏️</button>
                     )}

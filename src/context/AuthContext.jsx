@@ -4,7 +4,7 @@ import { supabase, LS_TOKEN } from '../lib/supabase'
 const AuthContext = createContext(null)
 
 export const ROLES = {
-  super_admin: { label: 'Super Admin', color: '#ef4444',        bg: '#fee2e2' },
+  super_admin: { label: 'Super Admin', color: 'var(--red)',     bg: 'var(--red-light)' },
   admin:       { label: 'Admin',       color: 'var(--accent2)', bg: 'var(--accent2-light)' },
   editor:      { label: 'Editor',      color: 'var(--accent3)', bg: 'var(--accent3-light)' },
   viewer:      { label: 'Viewer',      color: 'var(--text3)',   bg: 'var(--surface2)' },

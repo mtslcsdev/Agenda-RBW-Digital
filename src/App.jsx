@@ -155,8 +155,8 @@ function AppLayout() {
 function SessionHeaderWarning() {
   return (
     <div style={{
-      background: '#fef3c7', color: '#92400e', padding: '10px 16px',
-      fontSize: '13px', lineHeight: 1.5, borderBottom: '1px solid #fcd34d',
+      background: 'var(--yellow-light)', color: 'var(--yellow)', padding: '10px 16px',
+      fontSize: '13px', lineHeight: 1.5, borderBottom: '1px solid var(--yellow)',
     }}>
       ⚠️ <strong>Sessão não reconhecida pelo servidor.</strong> Os dados não vão
       carregar até isso ser resolvido. Tente sair e entrar de novo — se

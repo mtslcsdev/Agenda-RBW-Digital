@@ -22,6 +22,19 @@ export const PRIORITY_COLORS = { Normal: null, Alta: 'var(--accent2)', Urgente: 
 export const COLUMN_COLORS = [
   '#6B6960', '#E07A3A', '#2D6A4F', '#5B4FCF', '#D94F3D', '#E8A923', '#3A7CA5',
 ]
+
+// As cores de coluna e etiqueta são escolhidas pela pessoa, então não dá para
+// fixar o texto em branco: sobre o amarelo, por exemplo, fica ilegível.
+// Decide entre texto claro e escuro pela luminância da cor de fundo.
+export function corDeTexto(hex) {
+  const h = String(hex || '').replace('#', '')
+  if (h.length !== 6) return '#ffffff'
+  const r = parseInt(h.slice(0, 2), 16)
+  const g = parseInt(h.slice(2, 4), 16)
+  const b = parseInt(h.slice(4, 6), 16)
+  const luminancia = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminancia > 0.6 ? '#1a1f30' : '#ffffff'
+}
 // Espaçamento entre posições. Inserções usam a média entre vizinhos, então
 // esse valor só precisa ser grande o bastante para não esgotar a precisão.
 const POSITION_GAP = 1000

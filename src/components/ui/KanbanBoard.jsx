@@ -227,7 +227,7 @@ function ColumnHeader({ col, count, index, total }) {
             style={{
               position: 'absolute', top: '100%', right: 0, zIndex: 11, minWidth: '190px',
               background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', padding: '6px',
+              borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow-md)', padding: '6px',
             }}
           >
             <button className="btn btn-ghost" style={menuItem}

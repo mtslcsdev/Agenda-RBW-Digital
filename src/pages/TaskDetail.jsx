@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { useMatch, useNavigate } from 'react-router-dom'
-import { useApp, PRIORITY_COLORS, COLUMN_COLORS, formatDuration } from '../context/AppContext'
+import { useApp, PRIORITY_COLORS, COLUMN_COLORS, corDeTexto, formatDuration } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import { usePermission } from '../hooks/usePermission'
 import CommentSection from '../components/ui/CommentSection'
@@ -131,7 +131,7 @@ function Etiquetas({ taskId }) {
         {doCard.map(l => (
           <span key={l.id} style={{
             fontSize: '11px', fontWeight: 600, padding: '3px 9px', borderRadius: '10px',
-            background: l.color, color: 'white',
+            background: l.color, color: corDeTexto(l.color),
           }}>{l.name}</span>
         ))}
         {!doCard.length && <span style={{ fontSize: '12px', color: 'var(--text3)' }}>Nenhuma</span>}
@@ -155,7 +155,7 @@ function Etiquetas({ taskId }) {
                   style={{ cursor: 'pointer' }} />
                 <span style={{
                   fontSize: '11px', fontWeight: 600, padding: '2px 8px',
-                  borderRadius: '10px', background: l.color, color: 'white', flex: 1,
+                  borderRadius: '10px', background: l.color, color: corDeTexto(l.color), flex: 1,
                 }}>{l.name}</span>
                 <button className="btn-icon"
                   style={{ width: '20px', height: '20px', fontSize: '10px', color: 'var(--red)' }}
