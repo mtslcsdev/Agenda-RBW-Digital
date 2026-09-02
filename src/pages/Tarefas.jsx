@@ -3,7 +3,9 @@ import { useApp } from '../context/AppContext'
 import TaskItem from '../components/ui/TaskItem'
 import KanbanBoard from '../components/ui/KanbanBoard'
 
-const TABS = ['Todas', 'Hoje', 'Semana', 'Atrasadas', 'Quadro']
+// O quadro é a forma padrão de ver as tarefas; as demais abas são recortes
+// por data, em lista.
+const TABS = ['Quadro', 'Todas', 'Hoje', 'Semana', 'Atrasadas']
 
 function getWeekRange() {
   const today = new Date()
@@ -16,7 +18,7 @@ function getWeekRange() {
 
 export default function Tarefas({ onNew, onEdit }) {
   const { tasks, toggleTask, deleteTask, searchQuery, clients } = useApp()
-  const [activeTab, setActiveTab] = useState('Todas')
+  const [activeTab, setActiveTab] = useState('Quadro')
   const [tagFilter, setTagFilter] = useState('')
   const [clientFilter, setClientFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('')
@@ -76,9 +78,8 @@ export default function Tarefas({ onNew, onEdit }) {
         </div>
       </div>
 
-      {/* Filtros */}
-      {activeTab !== 'Quadro' && (
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
+      {/* Filtros — valem para o quadro também, e só mudam quando clicados */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
           {/* Tag */}
           <select
             value={tagFilter}
@@ -89,15 +90,18 @@ export default function Tarefas({ onNew, onEdit }) {
             {tags.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
 
-          {/* Cliente */}
-          <select
-            value={clientFilter}
-            onChange={e => setClientFilter(e.target.value)}
-            style={{ fontSize: '12px', padding: '5px 10px', borderRadius: '7px', border: '1px solid var(--border)', background: 'var(--surface)', color: clientFilter ? 'var(--accent)' : 'var(--text2)', fontFamily: 'Inter, sans-serif', cursor: 'pointer' }}
-          >
-            <option value="">Cliente: Todos</option>
-            {clients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-          </select>
+          {/* Cliente — no quadro o filtro já aparece como botões, então aqui
+              seria um segundo controle para a mesma coisa */}
+          {activeTab !== 'Quadro' && (
+            <select
+              value={clientFilter}
+              onChange={e => setClientFilter(e.target.value)}
+              style={{ fontSize: '12px', padding: '5px 10px', borderRadius: '7px', border: '1px solid var(--border)', background: 'var(--surface)', color: clientFilter ? 'var(--accent)' : 'var(--text2)', fontFamily: 'Inter, sans-serif', cursor: 'pointer' }}
+            >
+              <option value="">Cliente: Todos</option>
+              {clients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+            </select>
+          )}
 
           {/* Prioridade */}
           <select
@@ -132,11 +136,10 @@ export default function Tarefas({ onNew, onEdit }) {
             </button>
           )}
 
-          <span style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text3)' }}>
-            {filtered.length} tarefa{filtered.length !== 1 ? 's' : ''}
-          </span>
-        </div>
-      )}
+        <span style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text3)' }}>
+          {filtered.length} tarefa{filtered.length !== 1 ? 's' : ''}
+        </span>
+      </div>
 
       {activeTab === 'Quadro' ? (
         <KanbanBoard tasks={filtered} onNew={onNew} onEdit={onEdit}
