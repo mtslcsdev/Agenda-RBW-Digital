@@ -54,14 +54,14 @@ export default function AdminUsuarios() {
   }
 
   // ── Criar usuário ─────────────────────────────────────────────
-  function handleAdd(e) {
+  async function handleAdd(e) {
     e.preventDefault()
     if (!form.name.trim())  return setFormError('Nome obrigatório')
     if (!form.email.trim()) return setFormError('E-mail obrigatório')
     const pwd = form.password.trim() || genPassword()
     setSaving(true)
     setFormError('')
-    const { ok, error } = createInvitedUser(form.email.trim(), pwd, form.name.trim(), form.role)
+    const { ok, error } = await createInvitedUser(form.email.trim(), pwd, form.name.trim(), form.role)
     setSaving(false)
     if (!ok) { setFormError(error || 'Erro ao criar usuário'); return }
     setCreatedUser({ name: form.name, email: form.email, password: pwd, role: form.role })
@@ -79,10 +79,10 @@ export default function AdminUsuarios() {
     setResetPwdFor(null)
   }
 
-  function handleRename(userId) {
+  async function handleRename(userId) {
     if (!newName.trim()) { setNameError('Nome obrigatório'); return }
     setNameError('')
-    const { ok, error } = renameUser(userId, newName)
+    const { ok, error } = await renameUser(userId, newName)
     if (!ok) { setNameError(error || 'Erro ao salvar'); return }
     setNameSuccess(userId)
     setTimeout(() => { setNameSuccess(null); setEditingName(null); setNewName('') }, 1400)
@@ -98,11 +98,11 @@ export default function AdminUsuarios() {
     setConfirmRemove(null)
   }
 
-  function handleResetPwd(userId) {
+  async function handleResetPwd(userId) {
     const pwd = newPwd.trim()
     if (!pwd) { setPwdError('Digite a nova senha'); return }
     setPwdError('')
-    const { ok, error } = resetUserPassword(userId, pwd)
+    const { ok, error } = await resetUserPassword(userId, pwd)
     if (!ok) { setPwdError(error || 'Erro'); return }
     setPwdSuccess(userId)
     setTimeout(() => { setPwdSuccess(null); setResetPwdFor(null); setNewPwd('') }, 1400)
@@ -148,7 +148,7 @@ export default function AdminUsuarios() {
             </div>
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '10px' }}>
-            ⚠️ O usuário precisa fazer login neste dispositivo com essas credenciais. A lista de usuários é local — compartilhe o e-mail e senha diretamente.
+            ⚠️ Copie a senha agora — ela não será exibida novamente. O usuário já pode entrar de qualquer dispositivo.
           </div>
           <button className="btn btn-ghost" style={{ marginTop: '10px', fontSize: '12px' }} onClick={() => setCreatedUser(null)}>
             OK, já copiei
@@ -344,7 +344,7 @@ export default function AdminUsuarios() {
       </div>
 
       <div style={{ marginTop: '16px', padding: '12px 16px', background: 'var(--surface2)', borderRadius: '8px', fontSize: '12px', color: 'var(--text3)', lineHeight: 1.6 }}>
-        🔐 <strong style={{ color: 'var(--text2)' }}>Usuários locais:</strong> A lista de usuários é salva neste navegador. Ao criar um novo usuário, compartilhe o e-mail e senha com a pessoa — ela deve fazer login pelo mesmo link do sistema.
+        🔐 <strong style={{ color: 'var(--text2)' }}>Acesso pela web:</strong> Os usuários ficam salvos no servidor. Ao criar um novo usuário, envie o e-mail e a senha para a pessoa — ela pode entrar pelo link do sistema de qualquer computador ou celular.
       </div>
     </>
   )
