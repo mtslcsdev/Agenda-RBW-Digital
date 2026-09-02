@@ -11,6 +11,7 @@ import ClientModal from './components/ClientModal'
 import Dashboard from './pages/Dashboard'
 import Agenda from './pages/Agenda'
 import Tarefas from './pages/Tarefas'
+import TaskDetail from './pages/TaskDetail'
 import Clientes from './pages/Clientes'
 import ClientDetail from './pages/ClientDetail'
 import AdminUsuarios from './pages/AdminUsuarios'
@@ -119,6 +120,9 @@ function AppLayout() {
             <Route path="/" element={<Dashboard onNewTask={openNewTask} onEditTask={openEditTask} />} />
             <Route path="/agenda" element={<Agenda />} />
             <Route path="/tarefas" element={<Tarefas onNew={openNewTask} onEdit={openEditTask} />} />
+            {/* O detalhe do card é um modal sobre o quadro — a mesma página fica
+                atrás, e o link /tarefas/:id continua abrindo direto. */}
+            <Route path="/tarefas/:id" element={<Tarefas onNew={openNewTask} onEdit={openEditTask} />} />
             <Route path="/clientes" element={<Clientes onNew={openNewClient} onEdit={openEditClient} />} />
             <Route path="/clientes/:id" element={<ClientDetail onNewTask={openNewTask} onEditTask={openEditTask} onEditClient={openEditClient} />} />
             <Route path="/docs" element={<Docs />} />
@@ -133,6 +137,7 @@ function AppLayout() {
         </div>
       </div>
 
+      <TaskDetail />
       <TaskModal
         open={taskOpen}
         onClose={() => { setTaskOpen(false); setEditingTask(null); setTaskPreset(null) }}

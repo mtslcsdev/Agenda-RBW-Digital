@@ -69,6 +69,11 @@ const mapColumn = r => ({
   isDone: r.is_done || false,
   archived: r.archived || false,
 })
+const mapChecklistItem = r => ({
+  id: r.id, taskId: r.task_id, text: r.text,
+  done: r.done || false, position: Number(r.position),
+})
+const mapLabel = r => ({ id: r.id, name: r.name, color: r.color || '#2D6A4F' })
 const mapComment = r => ({
   id: r.id, userId: r.user_id, userName: r.user_name,
   userColor: r.user_color, userInitials: r.user_initials,
@@ -137,6 +142,9 @@ export function AppProvider({ children }) {
   const [docs, setDocsState]              = useState([])
   const [folders, setFoldersState]        = useState([])
   const [columns, setColumnsState]        = useState([])
+  const [checklists, setChecklists]       = useState({})   // taskId -> itens
+  const [labels, setLabelsState]          = useState([])
+  const [taskLabels, setTaskLabels]       = useState({})   // taskId -> [labelId]
   const [activeTimer, setActiveTimer]     = useState(() => {
     try { return JSON.parse(localStorage.getItem('fd_activeTimer')) } catch { return null }
   })
@@ -202,11 +210,28 @@ export function AppProvider({ children }) {
       }
 
       // Fase 2 — background (comments, activity, time)
-      const [cmRes, aRes, eRes] = await Promise.all([
+      const [cmRes, aRes, eRes, chkRes, lblRes, tlRes] = await Promise.all([
         supabase.from('comments').select('*').order('created_at', { ascending: true }),
         supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(50),
         supabase.from('time_entries').select('*'),
+        supabase.from('task_checklist').select('*').order('position'),
+        supabase.from('labels').select('*').order('name'),
+        supabase.from('task_labels').select('*'),
       ])
+
+      if (chkRes.data) {
+        const porTarefa = {}
+        chkRes.data.forEach(r => {
+          (porTarefa[r.task_id] ||= []).push(mapChecklistItem(r))
+        })
+        setChecklists(porTarefa)
+      }
+      if (lblRes.data) setLabelsState(lblRes.data.map(mapLabel))
+      if (tlRes.data) {
+        const porTarefa = {}
+        tlRes.data.forEach(r => { (porTarefa[r.task_id] ||= []).push(r.label_id) })
+        setTaskLabels(porTarefa)
+      }
       if (cmRes.data) {
         const grouped = {}
         cmRes.data.forEach(c => {
@@ -513,6 +538,107 @@ export function AppProvider({ children }) {
     return { ok: true }
   }
 
+  // ── CHECKLIST DO CARD ─────────────────────────────────────────
+  function getChecklist(taskId) { return checklists[taskId] || [] }
+
+  function checklistProgress(taskId) {
+    const itens = getChecklist(taskId)
+    if (!itens.length) return null
+    const feitos = itens.filter(i => i.done).length
+    return { feitos, total: itens.length, pct: Math.round((feitos / itens.length) * 100) }
+  }
+
+  async function addChecklistItem(taskId, text) {
+    const texto = (text || '').trim()
+    if (!texto) return
+    const atuais  = getChecklist(taskId)
+    const position = atuais.length ? Math.max(...atuais.map(i => i.position)) + POSITION_GAP : POSITION_GAP
+    const tmp = { id: 'tmp-' + Date.now(), taskId, text: texto, done: false, position }
+
+    setChecklists(prev => ({ ...prev, [taskId]: [...atuais, tmp] }))
+    const { data: row, error } = await supabase
+      .from('task_checklist').insert({ task_id: taskId, text: texto, position }).select().single()
+
+    if (error) {
+      setChecklists(prev => ({ ...prev, [taskId]: (prev[taskId] || []).filter(i => i.id !== tmp.id) }))
+      return
+    }
+    setChecklists(prev => ({
+      ...prev,
+      [taskId]: (prev[taskId] || []).map(i => i.id === tmp.id ? mapChecklistItem(row) : i),
+    }))
+  }
+
+  async function toggleChecklistItem(taskId, itemId) {
+    const item = getChecklist(taskId).find(i => i.id === itemId)
+    if (!item) return
+    const done = !item.done
+    setChecklists(prev => ({
+      ...prev,
+      [taskId]: prev[taskId].map(i => i.id === itemId ? { ...i, done } : i),
+    }))
+    const { error } = await supabase.from('task_checklist').update({ done }).eq('id', itemId)
+    if (error) {
+      setChecklists(prev => ({
+        ...prev,
+        [taskId]: prev[taskId].map(i => i.id === itemId ? { ...i, done: !done } : i),
+      }))
+    }
+  }
+
+  async function deleteChecklistItem(taskId, itemId) {
+    const anterior = getChecklist(taskId)
+    setChecklists(prev => ({ ...prev, [taskId]: anterior.filter(i => i.id !== itemId) }))
+    const { error } = await supabase.from('task_checklist').delete().eq('id', itemId)
+    if (error) setChecklists(prev => ({ ...prev, [taskId]: anterior }))
+  }
+
+  // ── ETIQUETAS ─────────────────────────────────────────────────
+  function getTaskLabels(taskId) {
+    const ids = taskLabels[taskId] || []
+    return labels.filter(l => ids.includes(l.id))
+  }
+
+  async function toggleTaskLabel(taskId, labelId) {
+    const atuais = taskLabels[taskId] || []
+    const tinha  = atuais.includes(labelId)
+    setTaskLabels(prev => ({
+      ...prev,
+      [taskId]: tinha ? atuais.filter(id => id !== labelId) : [...atuais, labelId],
+    }))
+
+    const { error } = tinha
+      ? await supabase.from('task_labels').delete().eq('task_id', taskId).eq('label_id', labelId)
+      : await supabase.from('task_labels').insert({ task_id: taskId, label_id: labelId })
+
+    if (error) setTaskLabels(prev => ({ ...prev, [taskId]: atuais }))
+  }
+
+  async function addLabel(name, color) {
+    const nome = (name || '').trim()
+    if (!nome) return { ok: false, error: 'Dê um nome à etiqueta.' }
+    const { data: row, error } = await supabase
+      .from('labels').insert({ name: nome, color: color || COLUMN_COLORS[0] }).select().single()
+    if (error) {
+      if (error.code === '23505') return { ok: false, error: 'Já existe uma etiqueta com esse nome.' }
+      return { ok: false, error: error.message }
+    }
+    setLabelsState(prev => [...prev, mapLabel(row)].sort((a, b) => a.name.localeCompare(b.name)))
+    return { ok: true, label: mapLabel(row) }
+  }
+
+  async function deleteLabel(labelId) {
+    const anterior = labels
+    setLabelsState(prev => prev.filter(l => l.id !== labelId))
+    setTaskLabels(prev => {
+      const novo = {}
+      Object.entries(prev).forEach(([tid, ids]) => { novo[tid] = ids.filter(id => id !== labelId) })
+      return novo
+    })
+    const { error } = await supabase.from('labels').delete().eq('id', labelId)
+    if (error) setLabelsState(anterior)
+  }
+
   // ── CLIENTS ───────────────────────────────────────────────────
   async function addClient(data) {
     const tmp = { ...data, id: 'tmp-' + Date.now(), archived: false }
@@ -707,6 +833,8 @@ export function AppProvider({ children }) {
       tasks: activeTasks, allTasks: tasks, archivedTasks,
       addTask, editTask, deleteTask, toggleTask, moveTask, archiveTask,
       columns, addColumn, updateColumn, moveColumn, archiveColumn, reorderColumn,
+      getChecklist, checklistProgress, addChecklistItem, toggleChecklistItem, deleteChecklistItem,
+      labels, getTaskLabels, toggleTaskLabel, addLabel, deleteLabel,
       clients: activeClients, allClients: clients, hiddenClients, archivedClients,
       addClient, editClient, archiveClient, toggleClientHidden,
       notes: activeNotes, allNotes: notes, archivedNotes,

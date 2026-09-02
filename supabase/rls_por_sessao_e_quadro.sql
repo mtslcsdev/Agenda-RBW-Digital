@@ -108,3 +108,52 @@ END $$;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.board_columns TO anon, authenticated;
 GRANT USAGE, SELECT ON SEQUENCE public.board_columns_id_seq TO anon, authenticated;
+
+-- ── Conteúdo do card: subtarefas e etiquetas ──────────────────
+CREATE TABLE IF NOT EXISTS public.task_checklist (
+  id         bigserial PRIMARY KEY,
+  task_id    bigint  NOT NULL REFERENCES public.tasks(id) ON DELETE CASCADE,
+  text       text    NOT NULL,
+  done       boolean NOT NULL DEFAULT false,
+  position   numeric NOT NULL DEFAULT 1000,
+  created_at timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS task_checklist_task_idx ON public.task_checklist(task_id);
+
+-- Etiquetas reutilizáveis, no lugar da tag única por card
+CREATE TABLE IF NOT EXISTS public.labels (
+  id         bigserial PRIMARY KEY,
+  name       text NOT NULL UNIQUE,
+  color      text NOT NULL DEFAULT '#2D6A4F',
+  created_at timestamptz DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS public.task_labels (
+  task_id  bigint NOT NULL REFERENCES public.tasks(id)  ON DELETE CASCADE,
+  label_id bigint NOT NULL REFERENCES public.labels(id) ON DELETE CASCADE,
+  PRIMARY KEY (task_id, label_id)
+);
+CREATE INDEX IF NOT EXISTS task_labels_task_idx ON public.task_labels(task_id);
+
+DO $$
+DECLARE t text; pol record;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['task_checklist','labels','task_labels'] LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+    FOR pol IN SELECT policyname FROM pg_policies WHERE schemaname='public' AND tablename=t LOOP
+      EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, t);
+    END LOOP;
+    EXECUTE format($f$CREATE POLICY "rbw_read" ON public.%I FOR SELECT TO anon, authenticated
+      USING (public.rbw_role() IS NOT NULL)$f$, t);
+    EXECUTE format($f$CREATE POLICY "rbw_insert" ON public.%I FOR INSERT TO anon, authenticated
+      WITH CHECK (public.rbw_role() IN ('editor','admin','super_admin'))$f$, t);
+    EXECUTE format($f$CREATE POLICY "rbw_update" ON public.%I FOR UPDATE TO anon, authenticated
+      USING (public.rbw_role() IN ('editor','admin','super_admin'))
+      WITH CHECK (public.rbw_role() IN ('editor','admin','super_admin'))$f$, t);
+    EXECUTE format($f$CREATE POLICY "rbw_delete" ON public.%I FOR DELETE TO anon, authenticated
+      USING (public.rbw_role() IN ('editor','admin','super_admin'))$f$, t);
+  END LOOP;
+END $$;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.task_checklist, public.labels, public.task_labels TO anon, authenticated;
+GRANT USAGE, SELECT ON SEQUENCE public.task_checklist_id_seq TO anon, authenticated;
+GRANT USAGE, SELECT ON SEQUENCE public.labels_id_seq         TO anon, authenticated;

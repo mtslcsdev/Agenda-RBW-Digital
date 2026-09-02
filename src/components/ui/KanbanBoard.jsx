@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   DndContext,
   DragOverlay,
@@ -42,27 +43,48 @@ function getRelativeDate(iso) {
 
 // ── Card ───────────────────────────────────────────────────────
 
-function CardContent({ task, onEdit, showActions = true }) {
-  const { deleteTask } = useApp()
+function CardContent({ task, onEdit, showActions = true, onOpen }) {
+  const { deleteTask, getTaskLabels, checklistProgress } = useApp()
   const { canEdit, canDelete } = usePermission()
   const [hovered, setHovered] = useState(false)
   const rel = getRelativeDate(task.date)
   const priorityColor = PRIORITY_COLORS[task.priority]
+  const etiquetas = getTaskLabels(task.id)
+  const prog = checklistProgress(task.id)
 
   return (
     <div
       className="kanban-card"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onClick={onOpen}
+      style={onOpen ? { cursor: 'pointer' } : undefined}
     >
       {priorityColor && (
         <div className="kanban-priority-bar" style={{ background: priorityColor }} />
       )}
       <div className="kanban-card-body">
+        {etiquetas.length > 0 && (
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '6px' }}>
+            {etiquetas.map(l => (
+              <span key={l.id} title={l.name} style={{
+                height: '6px', width: '26px', borderRadius: '3px', background: l.color,
+              }} />
+            ))}
+          </div>
+        )}
         <div className="kanban-card-title">{task.title}</div>
         {task.client && <div className="kanban-card-client">{task.client}</div>}
         <div className="kanban-card-meta">
-          {task.tag && <TaskTag label={task.tag} color={task.tagColor} />}
+          {prog && (
+            <span style={{
+              fontSize: '11px', color: prog.pct === 100 ? 'var(--accent)' : 'var(--text3)',
+              fontWeight: prog.pct === 100 ? 600 : 400,
+            }}>
+              ☑ {prog.feitos}/{prog.total}
+            </span>
+          )}
+          {task.tag && !etiquetas.length && <TaskTag label={task.tag} color={task.tagColor} />}
           {rel && (
             <span
               className={`kanban-date${rel.overdue && !task.done ? ' overdue' : ''}`}
@@ -101,7 +123,7 @@ function CardContent({ task, onEdit, showActions = true }) {
   )
 }
 
-function SortableCard({ task, onEdit }) {
+function SortableCard({ task, onEdit, onOpen }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: String(task.id) })
 
@@ -117,7 +139,9 @@ function SortableCard({ task, onEdit }) {
       {...listeners}
       {...attributes}
     >
-      <CardContent task={task} onEdit={onEdit} />
+      {/* O sensor só inicia o arrasto após 8px, então um clique parado ainda
+          abre o card em vez de virar arrasto. */}
+      <CardContent task={task} onEdit={onEdit} onOpen={onOpen} />
     </div>
   )
 }
@@ -257,7 +281,7 @@ const menuItem = {
 
 // ── Coluna ─────────────────────────────────────────────────────
 
-function Column({ col, tasks, onNew, onEdit, index, total }) {
+function Column({ col, tasks, onNew, onEdit, onOpen, index, total }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col:${col.id}` })
   const ids = tasks.map(t => String(t.id))
 
@@ -280,7 +304,8 @@ function Column({ col, tasks, onNew, onEdit, index, total }) {
             </div>
           ) : (
             tasks.map(task => (
-              <SortableCard key={task.id} task={task} onEdit={onEdit} />
+              <SortableCard key={task.id} task={task} onEdit={onEdit}
+                onOpen={() => onOpen(task)} />
             ))
           )}
         </SortableContext>
@@ -358,6 +383,7 @@ export default function KanbanBoard({ tasks, onNew, onEdit, clientFilter, onClie
   const { columns, moveTask, reorderColumn } = useApp()
   const { effectiveUser } = useAuth()
   const { canEdit } = usePermission()
+  const navigate = useNavigate()
   const [activeTask, setActiveTask] = useState(null)
 
   const sensors = useSensors(
@@ -475,6 +501,7 @@ export default function KanbanBoard({ tasks, onNew, onEdit, clientFilter, onClie
               tasks={cardsDaColuna(col.id, i === 0)}
               onNew={onNew}
               onEdit={onEdit}
+              onOpen={t => navigate(`/tarefas/${t.id}`)}
               index={i}
               total={columns.length}
             />
