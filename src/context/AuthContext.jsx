@@ -10,27 +10,15 @@ export const ROLES = {
   viewer:      { label: 'Viewer',      color: 'var(--text3)',   bg: 'var(--surface2)' },
 }
 
-const COLORS = ['#2D6A4F', '#5B4FCF', '#E07A3A', '#D94F3D', '#E8A923', '#3A7CA5']
-const LS_SESSION    = 'rbw_session_v3'
-const LS_USER_CACHE = 'rbw_user_v3'
+const LS_TOKEN      = 'rbw_token_v4'
+const LS_USER_CACHE = 'rbw_user_v4'
 
-// Garante que a query Supabase não trave para sempre
-function withTimeout(promise, ms = 6000) {
+// Garante que nenhuma chamada ao Supabase trave a interface para sempre
+function withTimeout(promise, ms = 8000) {
   return Promise.race([
     promise,
     new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
   ])
-}
-
-function mapUser(row) {
-  return {
-    id: row.id,
-    name: row.name,
-    email: row.email,
-    role: row.role,
-    initials: row.initials || row.name?.slice(0, 2).toUpperCase() || '?',
-    color: row.color || '#2D6A4F',
-  }
 }
 
 function saveCache(user) {
@@ -38,6 +26,20 @@ function saveCache(user) {
 }
 function loadCache() {
   try { return JSON.parse(localStorage.getItem(LS_USER_CACHE)) } catch { return null }
+}
+function clearSession() {
+  try {
+    localStorage.removeItem(LS_TOKEN)
+    localStorage.removeItem(LS_USER_CACHE)
+  } catch {}
+}
+
+// Chama uma função RPC do banco. Toda a autenticação vive no servidor:
+// a tabela de usuários não é legível pela chave pública do site.
+async function rpc(fn, args) {
+  const { data, error } = await withTimeout(supabase.rpc(fn, args))
+  if (error) return { ok: false, error: error.message }
+  return data || { ok: false, error: 'Resposta vazia do servidor.' }
 }
 
 export function AuthProvider({ children }) {
@@ -48,54 +50,44 @@ export function AuthProvider({ children }) {
 
   // ── Restaura sessão ao abrir o app ───────────────────────────
   useEffect(() => {
-    const savedId = localStorage.getItem(LS_SESSION)
-    if (!savedId) { setAuthLoading(false); return }
+    const token = localStorage.getItem(LS_TOKEN)
+    if (!token) { setAuthLoading(false); return }
 
-    withTimeout(
-      supabase.from('users').select('*').eq('id', savedId).single()
-    )
-      .then(({ data, error }) => {
-        if (data && !error) {
-          const u = mapUser(data)
-          setCurrentUser(u)
-          saveCache(u)
+    rpc('rbw_session', { p_token: token })
+      .then(res => {
+        if (res.ok && res.user) {
+          setCurrentUser(res.user)
+          saveCache(res.user)
         } else {
-          // Usuário removido do banco — limpa sessão
-          localStorage.removeItem(LS_SESSION)
-          localStorage.removeItem(LS_USER_CACHE)
+          // Sessão expirada ou revogada
+          clearSession()
         }
       })
       .catch(() => {
-        // Supabase lento/offline → usa perfil em cache
+        // Servidor lento/offline → segue com o perfil em cache
         const cached = loadCache()
         if (cached) setCurrentUser(cached)
-        else {
-          localStorage.removeItem(LS_SESSION)
-          localStorage.removeItem(LS_USER_CACHE)
-        }
+        else clearSession()
       })
       .finally(() => setAuthLoading(false))
   }, [])
 
-  const profile      = currentUser
+  const profile       = currentUser
   const effectiveUser = viewingAs || profile
+  const token         = () => localStorage.getItem(LS_TOKEN)
 
   // ── Login ────────────────────────────────────────────────────
   async function login(email, password) {
     try {
-      const { data, error } = await withTimeout(
-        supabase
-          .from('users')
-          .select('*')
-          .eq('email', email.toLowerCase().trim())
-          .eq('password', password)
-          .single()
-      )
-      if (error || !data) return { ok: false, error: 'E-mail ou senha incorretos.' }
-      const u = mapUser(data)
-      setCurrentUser(u)
-      saveCache(u)
-      localStorage.setItem(LS_SESSION, data.id)
+      const res = await rpc('rbw_login', {
+        p_email: email.toLowerCase().trim(),
+        p_password: password,
+      })
+      if (!res.ok) return { ok: false, error: res.error || 'E-mail ou senha incorretos.' }
+
+      localStorage.setItem(LS_TOKEN, res.token)
+      setCurrentUser(res.user)
+      saveCache(res.user)
       return { ok: true }
     } catch (e) {
       if (e.message === 'timeout')
@@ -106,81 +98,84 @@ export function AuthProvider({ children }) {
 
   // ── Logout ───────────────────────────────────────────────────
   function logout() {
+    const t = token()
     setCurrentUser(null)
     setViewingAs(null)
-    localStorage.removeItem(LS_SESSION)
-    localStorage.removeItem(LS_USER_CACHE)
+    setUsers([])
+    clearSession()
+    if (t) rpc('rbw_logout', { p_token: t }).catch(() => {})
   }
 
-  // ── Carregar todos os usuários (admin) ───────────────────────
+  // ── Listar usuários (admin) ──────────────────────────────────
   async function fetchAllProfiles() {
-    const { data } = await supabase.from('users').select('*').order('created_at')
-    if (data) setUsers(data.map(mapUser))
+    const res = await rpc('rbw_list_users', { p_token: token() })
+    if (res.ok && res.users) setUsers(res.users)
   }
 
   // ── Criar usuário ────────────────────────────────────────────
   async function createInvitedUser(email, password, name, role) {
-    const { error } = await supabase.from('users').insert({
-      id: 'u-' + Date.now(),
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      password,
-      role,
-      initials: name.trim().slice(0, 2).toUpperCase(),
-      color: COLORS[users.length % COLORS.length],
+    const res = await rpc('rbw_create_user', {
+      p_token: token(), p_name: name, p_email: email, p_password: password, p_role: role,
     })
-    if (error) {
-      if (error.code === '23505') return { ok: false, error: 'E-mail já cadastrado.' }
-      return { ok: false, error: error.message }
-    }
-    await fetchAllProfiles()
-    return { ok: true }
+    if (res.ok) await fetchAllProfiles()
+    return res
   }
 
   // ── Atualizar papel ──────────────────────────────────────────
   async function updateUserRole(userId, role) {
-    await supabase.from('users').update({ role }).eq('id', userId)
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u))
-    if (profile?.id === userId) setCurrentUser(u => ({ ...u, role }))
+    const res = await rpc('rbw_update_role', {
+      p_token: token(), p_user_id: userId, p_role: role,
+    })
+    if (res.ok) {
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u))
+      if (profile?.id === userId) {
+        const updated = { ...profile, role }
+        setCurrentUser(updated)
+        saveCache(updated)
+      }
+    } else {
+      await fetchAllProfiles()
+    }
+    return res
   }
 
   // ── Remover usuário ──────────────────────────────────────────
   async function removeUser(userId) {
-    await supabase.from('users').delete().eq('id', userId)
-    setUsers(prev => prev.filter(u => u.id !== userId))
+    const res = await rpc('rbw_delete_user', { p_token: token(), p_user_id: userId })
+    if (res.ok) setUsers(prev => prev.filter(u => u.id !== userId))
+    else await fetchAllProfiles()
+    return res
   }
 
   // ── Renomear usuário ─────────────────────────────────────────
   async function renameUser(userId, newName) {
     const name = newName.trim()
-    if (!name) return { ok: false, error: 'Nome não pode ser vazio.' }
+    const res = await rpc('rbw_rename_user', {
+      p_token: token(), p_user_id: userId, p_name: name,
+    })
+    if (!res.ok) return res
+
     const initials = name.slice(0, 2).toUpperCase()
-    const { error } = await supabase.from('users').update({ name, initials }).eq('id', userId)
-    if (error) return { ok: false, error: error.message }
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, name, initials } : u))
     if (profile?.id === userId) {
       const updated = { ...profile, name, initials }
       setCurrentUser(updated)
       saveCache(updated)
     }
-    return { ok: true }
+    return res
   }
 
-  // ── Reset de senha ───────────────────────────────────────────
+  // ── Definir senha ────────────────────────────────────────────
   async function resetUserPassword(userId, newPassword) {
-    if (!newPassword || newPassword.length < 4)
-      return { ok: false, error: 'Senha deve ter mínimo 4 caracteres.' }
-    const { error } = await supabase
-      .from('users').update({ password: newPassword }).eq('id', userId)
-    if (error) return { ok: false, error: error.message }
-    return { ok: true }
+    return rpc('rbw_set_password', {
+      p_token: token(), p_user_id: userId, p_password: newPassword,
+    })
   }
 
-  // ── Verifica senha atual ──────────────────────────────────────
-  async function verifyPassword(userId, password) {
-    const { data } = await supabase
-      .from('users').select('id').eq('id', userId).eq('password', password).single()
-    return !!data
+  // ── Confere a senha atual do usuário logado ──────────────────
+  async function verifyPassword(_userId, password) {
+    const res = await rpc('rbw_verify_password', { p_token: token(), p_password: password })
+    return res.ok === true
   }
 
   // ── Impersonação ─────────────────────────────────────────────

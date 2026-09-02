@@ -6,16 +6,19 @@
 -- ============================================================
 
 -- 1. users (login da aplicação)
+-- ATENÇÃO: a senha nunca é gravada em texto puro — só o hash bcrypt.
+-- As tabelas `users` e `user_sessions` NÃO são acessíveis pela chave pública;
+-- todo o login e a gestão de usuários passam pelas funções em auth_secure.sql.
 CREATE TABLE IF NOT EXISTS public.users (
-  id         text PRIMARY KEY,
-  name       text NOT NULL,
-  email      text UNIQUE NOT NULL,
-  password   text NOT NULL,
-  role       text NOT NULL DEFAULT 'editor'
-               CHECK (role IN ('super_admin','admin','editor','viewer')),
-  initials   text,
-  color      text DEFAULT '#2D6A4F',
-  created_at timestamptz DEFAULT now()
+  id            text PRIMARY KEY,
+  name          text NOT NULL,
+  email         text UNIQUE NOT NULL,
+  password_hash text NOT NULL,
+  role          text NOT NULL DEFAULT 'editor'
+                  CHECK (role IN ('super_admin','admin','editor','viewer')),
+  initials      text,
+  color         text DEFAULT '#2D6A4F',
+  created_at    timestamptz DEFAULT now()
 );
 
 -- 2. clients
@@ -133,14 +136,15 @@ CREATE TABLE IF NOT EXISTS public.docs (
 );
 
 -- ============================================================
--- RLS — acesso via chave publishable (anon).
--- O controle de permissão por papel é feito na aplicação.
+-- RLS — tabelas de dados acessíveis via chave publishable (anon).
+-- `users` e `user_sessions` ficam de fora de propósito: são trancadas
+-- em auth_secure.sql e só podem ser tocadas pelas funções de login.
 -- ============================================================
 DO $$
 DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
-    'users','clients','tasks','notes','comments',
+    'clients','tasks','notes','comments',
     'time_entries','activity_log','folders','docs'
   ] LOOP
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
@@ -150,7 +154,15 @@ BEGIN
   END LOOP;
 END $$;
 
--- Admin inicial
-INSERT INTO public.users (id, name, email, password, role, initials, color)
-VALUES ('u-rbw-admin', 'Mateus', 'mateus@rbw.com', 'rbw2024', 'super_admin', 'MA', '#2D6A4F')
+-- Admin inicial (senha gravada como hash bcrypt, nunca em texto puro).
+-- Troque a senha no primeiro acesso pelo menu do usuário.
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+
+INSERT INTO public.users (id, name, email, password_hash, role, initials, color)
+VALUES ('u-rbw-admin', 'Mateus', 'mateus@rbw.com',
+        extensions.crypt('rbw2024', extensions.gen_salt('bf', 10)),
+        'super_admin', 'MA', '#2D6A4F')
 ON CONFLICT (id) DO NOTHING;
+
+-- Em seguida rode auth_secure.sql para criar as funções de login e
+-- trancar as tabelas de usuários.
