@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { usePermission } from '../hooks/usePermission'
 import TaskItem from '../components/ui/TaskItem'
 import TaskTag from '../components/ui/TaskTag'
+import Anexos from '../components/ui/Anexos'
 
 const DEFAULT_PIPELINE = [
   { label: 'Onboarding', status: 'done' },
@@ -29,7 +30,7 @@ function timeAgo(iso) {
 export default function ClientDetail({ onNewTask, onEditTask, onEditClient }) {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { clients, allClients, tasks, toggleTask, deleteTask, docs, folders, addDoc, addFolder, archiveClient, toggleClientHidden } = useApp()
+  const { clients, allClients, tasks, toggleTask, deleteTask, docs, folders, addDoc, addFolder, archiveClient, toggleClientHidden, getAttachments } = useApp()
   const { effectiveUser } = useAuth()
   const { canEdit, canDelete, canArchive, canSeeHidden } = usePermission()
   const [activeTab, setActiveTab] = useState('tarefas') // 'tarefas' | 'documentos'
@@ -53,6 +54,7 @@ export default function ClientDetail({ onNewTask, onEditTask, onEditClient }) {
   const clientTasks = tasks.filter(t =>
     t.client_id ? t.client_id === client.id : t.client === client.name)
   const clientDocs = docs.filter(d => d.clientId === String(client.id))
+  const clientFiles = getAttachments({ clientId: client.id })
   const clientFolder = folders.find(f => f.clientId === String(client.id))
 
   const donePipeline = DEFAULT_PIPELINE.filter(s => s.status === 'done').length
@@ -151,6 +153,9 @@ export default function ClientDetail({ onNewTask, onEditTask, onEditClient }) {
         <div className={`tab${activeTab === 'documentos' ? ' active' : ''}`} onClick={() => setActiveTab('documentos')}>
           📄 Documentos ({clientDocs.length})
         </div>
+        <div className={`tab${activeTab === 'arquivos' ? ' active' : ''}`} onClick={() => setActiveTab('arquivos')}>
+          📎 Arquivos ({clientFiles.length})
+        </div>
       </div>
 
       {/* Tarefas */}
@@ -169,6 +174,13 @@ export default function ClientDetail({ onNewTask, onEditTask, onEditClient }) {
               <TaskItem key={task.id} task={task} onToggle={toggleTask} onEdit={onEditTask} onDelete={deleteTask} showDate />
             ))
           )}
+        </div>
+      )}
+
+      {/* Arquivos — briefing, arte, print, contrato */}
+      {activeTab === 'arquivos' && (
+        <div className="card">
+          <Anexos clientId={client.id} />
         </div>
       )}
 

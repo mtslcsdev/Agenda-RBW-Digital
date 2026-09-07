@@ -4,6 +4,7 @@ import { useApp, PRIORITY_COLORS, COLUMN_COLORS, corDeTexto, formatDuration } fr
 import { useAuth } from '../context/AuthContext'
 import { usePermission } from '../hooks/usePermission'
 import CommentSection from '../components/ui/CommentSection'
+import Anexos from '../components/ui/Anexos'
 
 // O TipTap é pesado (~380 kB). Carregar sob demanda mantém o quadro leve —
 // o editor só chega quando alguém abre um card.
@@ -316,6 +317,8 @@ export default function TaskDetail() {
             </section>
 
             <Checklist taskId={task.id} />
+
+            <Anexos taskId={task.id} />
 
             <section>
               <strong style={{ ...rotulo, display: 'block', marginBottom: '8px' }}>COMENTÁRIOS</strong>

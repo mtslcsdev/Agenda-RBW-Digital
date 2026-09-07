@@ -103,6 +103,18 @@ const mapChecklistItem = r => ({
   done: r.done || false, position: Number(r.position),
 })
 const mapLabel = r => ({ id: r.id, name: r.name, color: r.color || '#2D6A4F' })
+const mapAttachment = r => ({
+  id: r.id,
+  taskId: r.task_id ?? null,
+  clientId: r.client_id ?? null,
+  path: r.path,
+  url: r.url,
+  filename: r.filename,
+  mimeType: r.mime_type || '',
+  sizeBytes: Number(r.size_bytes || 0),
+  uploaderName: r.uploader_name || '',
+  createdAt: r.created_at,
+})
 const mapComment = r => ({
   id: r.id, userId: r.user_id, userName: r.user_name,
   userColor: r.user_color, userInitials: r.user_initials,
@@ -190,6 +202,7 @@ export function AppProvider({ children }) {
   })
   const [checklists, setChecklists]       = useState({})   // taskId -> itens
   const [labels, setLabelsState]          = useState([])
+  const [attachments, setAttachments]     = useState([])
   const [taskLabels, setTaskLabels]       = useState({})   // taskId -> [labelId]
   const [activeTimer, setActiveTimer]     = useState(() => {
     try { return JSON.parse(localStorage.getItem('fd_activeTimer')) } catch { return null }
@@ -267,16 +280,19 @@ export function AppProvider({ children }) {
       }
 
       // Fase 2 — background (comments, activity, time)
-      const [cmRes, aRes, eRes, chkRes, lblRes, tlRes, nfRes] = await Promise.all([
+      const [cmRes, aRes, eRes, chkRes, lblRes, tlRes, atRes, nfRes] = await Promise.all([
         supabase.from('comments').select('*').order('created_at', { ascending: true }),
         supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(50),
         supabase.from('time_entries').select('*'),
         supabase.from('task_checklist').select('*').order('position'),
         supabase.from('labels').select('*').order('name'),
         supabase.from('task_labels').select('*'),
+        supabase.from('attachments').select('*').order('created_at', { ascending: false }),
         supabase.from('notifications').select('*')
           .order('created_at', { ascending: false }).limit(30),
       ])
+
+      if (atRes.data) setAttachments(atRes.data.map(mapAttachment))
 
       if (nfRes.data) {
         // Os avisos efêmeros desta sessão (ainda com id temporário) continuam
@@ -685,6 +701,81 @@ export function AppProvider({ children }) {
     return { ok: true }
   }
 
+  // ── ANEXOS ────────────────────────────────────────────────────
+  const LIMITE_ARQUIVO = 25 * 1024 * 1024 // 25 MB, igual ao limite do bucket
+
+  function getAttachments({ taskId = null, clientId = null }) {
+    return attachments.filter(a =>
+      taskId != null ? a.taskId === taskId : a.clientId === clientId)
+  }
+
+  async function addAttachment(file, { taskId = null, clientId = null }, actor) {
+    if (!file) return { ok: false, error: 'Nenhum arquivo selecionado.' }
+    if (file.size > LIMITE_ARQUIVO) {
+      return {
+        ok: false,
+        error: `"${file.name}" tem ${(file.size / 1048576).toFixed(1)} MB. O limite por arquivo é 25 MB.`,
+      }
+    }
+
+    // O bucket é público, então o segredo está no caminho: um sufixo aleatório
+    // torna a URL impossível de adivinhar por quem não vê a listagem.
+    const aleatorio = crypto.randomUUID().replace(/-/g, '')
+    const extensao = file.name.includes('.') ? file.name.split('.').pop().slice(0, 10) : 'bin'
+    const pasta = taskId != null ? `tarefas/${taskId}` : `clientes/${clientId}`
+    const path = `${pasta}/${aleatorio}.${extensao}`
+
+    const { error: upErr } = await supabase.storage
+      .from('anexos')
+      .upload(path, file, { contentType: file.type || undefined, upsert: false })
+
+    if (upErr) {
+      const cheio = /exceeded|quota|storage/i.test(upErr.message || '')
+      return {
+        ok: false,
+        error: cheio
+          ? 'O espaço de armazenamento acabou. Apague anexos antigos ou fale sobre aumentar o plano do Supabase.'
+          : `Falha ao enviar: ${upErr.message}`,
+      }
+    }
+
+    const { data: pub } = supabase.storage.from('anexos').getPublicUrl(path)
+
+    const { data: row, error } = await supabase.from('attachments').insert({
+      task_id: taskId, client_id: clientId,
+      path, url: pub.publicUrl,
+      filename: file.name,
+      mime_type: file.type || '',
+      size_bytes: file.size,
+      uploaded_by: actor?.id || null,
+      uploader_name: actor?.name || '',
+    }).select().single()
+
+    if (error) {
+      // Não deixa arquivo órfão no storage se o registro falhar
+      await supabase.storage.from('anexos').remove([path])
+      return { ok: false, error: error.message }
+    }
+
+    setAttachments(prev => [mapAttachment(row), ...prev])
+    return { ok: true }
+  }
+
+  async function deleteAttachment(id) {
+    const anexo = attachments.find(a => a.id === id)
+    if (!anexo) return { ok: false, error: 'Anexo não encontrado.' }
+
+    setAttachments(prev => prev.filter(a => a.id !== id))
+    const { error } = await supabase.from('attachments').delete().eq('id', id)
+    if (error) {
+      setAttachments(prev => [anexo, ...prev])
+      return { ok: false, error: error.message }
+    }
+    // Best-effort: se o arquivo sobrar no storage, o registro já saiu da vista
+    await supabase.storage.from('anexos').remove([anexo.path])
+    return { ok: true }
+  }
+
   // ── CHECKLIST DO CARD ─────────────────────────────────────────
   function getChecklist(taskId) { return checklists[taskId] || [] }
 
@@ -1018,6 +1109,7 @@ export function AppProvider({ children }) {
       addBoard, renameBoard, archiveBoard,
       getChecklist, checklistProgress, addChecklistItem, toggleChecklistItem, deleteChecklistItem,
       labels, getTaskLabels, toggleTaskLabel, addLabel, deleteLabel,
+      getAttachments, addAttachment, deleteAttachment,
       clients: activeClients, allClients: clients, hiddenClients, archivedClients,
       addClient, editClient, archiveClient, toggleClientHidden,
       notes: activeNotes, allNotes: notes, archivedNotes,

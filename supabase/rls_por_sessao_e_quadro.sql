@@ -262,3 +262,67 @@ END $$;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.task_checklist, public.labels, public.task_labels TO anon, authenticated;
 GRANT USAGE, SELECT ON SEQUENCE public.task_checklist_id_seq TO anon, authenticated;
 GRANT USAGE, SELECT ON SEQUENCE public.labels_id_seq         TO anon, authenticated;
+
+-- ── Anexos (arquivos de tarefas e clientes) ───────────────────
+-- ATENÇÃO ao bucket ser público: o Storage do Supabase autoriza pelo JWT do
+-- Supabase Auth, que este app não usa (login próprio, por token em header).
+-- Com bucket privado o app não conseguiria exibir os arquivos sem uma Edge
+-- Function assinando cada URL.
+--
+-- O segredo está no CAMINHO: cada arquivo recebe um sufixo aleatório de 32
+-- hex, então a URL é impossível de adivinhar, e a listagem (que revela os
+-- caminhos) é protegida por RLS. Adequado para briefing, arte e print.
+-- NÃO guarde aqui documento pessoal ou contrato assinado.
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit)
+VALUES ('anexos', 'anexos', true, 26214400)  -- 25 MB por arquivo
+ON CONFLICT (id) DO UPDATE SET public = true, file_size_limit = 26214400;
+
+DROP POLICY IF EXISTS "rbw_anexos_select" ON storage.objects;
+DROP POLICY IF EXISTS "rbw_anexos_insert" ON storage.objects;
+DROP POLICY IF EXISTS "rbw_anexos_delete" ON storage.objects;
+CREATE POLICY "rbw_anexos_select" ON storage.objects FOR SELECT TO anon, authenticated
+  USING (bucket_id = 'anexos');
+CREATE POLICY "rbw_anexos_insert" ON storage.objects FOR INSERT TO anon, authenticated
+  WITH CHECK (bucket_id = 'anexos' AND public.rbw_role() IN ('editor','admin','super_admin'));
+CREATE POLICY "rbw_anexos_delete" ON storage.objects FOR DELETE TO anon, authenticated
+  USING (bucket_id = 'anexos' AND public.rbw_role() IN ('editor','admin','super_admin'));
+
+-- Um anexo pertence a uma tarefa OU a um cliente, nunca aos dois
+CREATE TABLE IF NOT EXISTS public.attachments (
+  id            bigserial PRIMARY KEY,
+  task_id       bigint REFERENCES public.tasks(id)   ON DELETE CASCADE,
+  client_id     bigint REFERENCES public.clients(id) ON DELETE CASCADE,
+  path          text NOT NULL,
+  url           text NOT NULL,
+  filename      text NOT NULL,
+  mime_type     text   DEFAULT '',
+  size_bytes    bigint DEFAULT 0,
+  uploaded_by   text REFERENCES public.users(id) ON DELETE SET NULL,
+  uploader_name text   DEFAULT '',
+  created_at    timestamptz DEFAULT now(),
+  CONSTRAINT attachments_dono_unico CHECK (
+    (task_id IS NOT NULL AND client_id IS NULL) OR
+    (task_id IS NULL AND client_id IS NOT NULL)
+  )
+);
+CREATE INDEX IF NOT EXISTS attachments_task_idx   ON public.attachments(task_id);
+CREATE INDEX IF NOT EXISTS attachments_client_idx ON public.attachments(client_id);
+
+ALTER TABLE public.attachments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "rbw_read"   ON public.attachments;
+DROP POLICY IF EXISTS "rbw_insert" ON public.attachments;
+DROP POLICY IF EXISTS "rbw_update" ON public.attachments;
+DROP POLICY IF EXISTS "rbw_delete" ON public.attachments;
+CREATE POLICY "rbw_read" ON public.attachments FOR SELECT TO anon, authenticated
+  USING (public.rbw_role() IS NOT NULL);
+CREATE POLICY "rbw_insert" ON public.attachments FOR INSERT TO anon, authenticated
+  WITH CHECK (public.rbw_role() IN ('editor','admin','super_admin'));
+CREATE POLICY "rbw_update" ON public.attachments FOR UPDATE TO anon, authenticated
+  USING (public.rbw_role() IN ('editor','admin','super_admin'))
+  WITH CHECK (public.rbw_role() IN ('editor','admin','super_admin'));
+CREATE POLICY "rbw_delete" ON public.attachments FOR DELETE TO anon, authenticated
+  USING (public.rbw_role() IN ('editor','admin','super_admin'));
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.attachments TO anon, authenticated;
+GRANT USAGE, SELECT ON SEQUENCE public.attachments_id_seq TO anon, authenticated;
